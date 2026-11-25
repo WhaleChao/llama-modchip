@@ -40,6 +40,7 @@ reset_tree() {
         "$LLAMA_DIR/common/rc_trie_v2.h" \
         "$LLAMA_DIR/common/rc_arbiter_l1.h" \
         "$LLAMA_DIR/common/rc_routecrack2.h" \
+        "$LLAMA_DIR/src/llama-inkling2-fused.h" \
         "$LLAMA_DIR/tools/server/rc_harp_radix.h"
     while read -r created_file; do
         [[ -n "$created_file" ]] && rm -f "$LLAMA_DIR/$created_file"
@@ -145,7 +146,7 @@ else
             -DGGML_F16C=ON
             -DGGML_BMI2=ON
             -DCMAKE_C_FLAGS="-march=haswell -mno-avx512f"
-            -DCMAKE_CXX_FLAGS="-march=haswell -mno-avx512f"
+            -DCMAKE_CXX_FLAGS="-march=haswell -mno-avx512f -DMODCHIP_INK2_DISABLE_AVX512"
             "${PORTABLE_LINK_ARGS[@]}"
         )
     elif [[ "${PORTABLE_X86_ISA:-}" == "avx512" ]]; then

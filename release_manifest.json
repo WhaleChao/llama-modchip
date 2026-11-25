@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "release_version": "3.2.0",
-  "release_tag": "v3.2.0",
+  "release_version": "3.2.1",
+  "release_tag": "v3.2.1",
   "patch_file": "patches/llama-modchip-v3.2.patch",
-  "patch_sha256": "43a090791e3d062be28106e65101418f644bb21c13feab681f4a471ce84419ab",
+  "patch_sha256": "c6d1b07b5abd97388637fced26571cf0d4b0d9c3452e00b008d70732450eafd6",
   "upstream_llama_cpp": {
     "commit": "46eb1742d",
     "build_number": 12604
@@ -27,7 +27,7 @@
     "tex": "paper/main.tex",
     "pdf": "paper/llama-modchip-paper.pdf",
     "tarball": "paper/arxiv-submission.tar.gz",
-    "required_version_string": "v3.2.0",
+    "required_version_string": "v3.2.1",
     "required_sections": [
       "RouteCrack 2.0",
       "Qwen3.8",
@@ -37,25 +37,25 @@
     "min_figures": 3
   },
   "mirrors": {
-    "github_release_base": "https://github.com/synchopate/llama-modchip/releases/download/v3.2.0",
+    "github_release_base": "https://github.com/synchopate/llama-modchip/releases/download/v3.2.1",
     "hf_binary_fallback_base": "https://huggingface.co/Synchopate/Qwen3.8-Flash-Next-MaxQ-64GB-GGUF/resolve/main"
   },
   "artifacts": {
-    "llama-server-modchip-linux-x86_64-avx512": "0cf2d3bcd31349d98bcef1d23af3545912b70930049437e8aa7f6cf5e2ff2082",
-    "llama-server-modchip-linux-x86_64-avx2": "d96745036cb44f76bce70237fc1e474058958e4d2eff739b85415eac4c78131d",
-    "llama-server-modchip-linux-x86_64": "d96745036cb44f76bce70237fc1e474058958e4d2eff739b85415eac4c78131d",
-    "llama-cli-modchip-linux-x86_64-avx512": "dc4c9da5016a8bf4407e14691407b0471625bb775cf76ad2a71e7bc25e0a98af",
-    "llama-cli-modchip-linux-x86_64-avx2": "08c6236eec64d645b0528d1752f8423bfa028753c8f974c46b6556b1a9022709",
-    "llama-cli-modchip-linux-x86_64": "08c6236eec64d645b0528d1752f8423bfa028753c8f974c46b6556b1a9022709",
-    "llama-bench-modchip-linux-x86_64-avx512": "9e40525f859214dc36aab36cb99bc81b68762816e1dbe07b31dc8d92b2a037e6",
-    "llama-bench-modchip-linux-x86_64-avx2": "5d6f9c7a8fd63d3ba6243f3c96b64fe7ae1fd762d814e8b509b9589465a7cff6",
-    "llama-perplexity-modchip-linux-x86_64-avx512": "b52c9b537ec9dc6f635b2d45e20b6d6b48123eacb7218584be5e1056a51e5913",
-    "llama-perplexity-modchip-linux-x86_64-avx2": "edae007a49e88e14d2d9a79f0d07fb2b32ee003c6016f55610806bf2ddbdfcc0",
-    "llama-quantize-modchip-linux-x86_64-avx512": "f24985fa7f595aded7bc9cb523bbf4153362126e80f7bf161b339d5c07352cbe",
-    "llama-quantize-modchip-linux-x86_64-avx2": "d8a00d6853b9c345a48c66ffa8948ac52d08b48db65c949831bfd2e890d49424"
+    "llama-server-modchip-linux-x86_64-avx512": "72f88dccd6f8b067e8bddf0a8beb246d7e955c0a87da5e6d997f74089695c6a7",
+    "llama-server-modchip-linux-x86_64-avx2": "94e349d7cd70fcc7812ee02d7a323afff141e2ee604cb7c2f79c18ddf6136493",
+    "llama-server-modchip-linux-x86_64": "94e349d7cd70fcc7812ee02d7a323afff141e2ee604cb7c2f79c18ddf6136493",
+    "llama-cli-modchip-linux-x86_64-avx512": "377a62c728260f06cd9cb155d524831d36e29377d2f428855e160358851d4b41",
+    "llama-cli-modchip-linux-x86_64-avx2": "ae5cd7e0f684f89f5b0114f9ddf84779ede68345d46ca330e9cc3846a4805067",
+    "llama-cli-modchip-linux-x86_64": "ae5cd7e0f684f89f5b0114f9ddf84779ede68345d46ca330e9cc3846a4805067",
+    "llama-bench-modchip-linux-x86_64-avx512": "309a515e4fba7832d6c47313dab7bc6ea06d9a1af1a39bf62c6e559f09993869",
+    "llama-bench-modchip-linux-x86_64-avx2": "a447f76f61a37c2a18763b3089eec109e94fc89126172f4fd5c1239ac20ce4f2",
+    "llama-perplexity-modchip-linux-x86_64-avx512": "9792b8594ac3cd355e0207abf3401567c879d45e4140755c40aecf4417af4761",
+    "llama-perplexity-modchip-linux-x86_64-avx2": "2d016b9583c41c77f2cb61366453432fe9818e47907f1066ab5a2a88f8762a5d",
+    "llama-quantize-modchip-linux-x86_64-avx512": "8d809463e3d1e9a3c2bb2fcfd21b43b54765dce0e54d5559d9183dc7c702b828",
+    "llama-quantize-modchip-linux-x86_64-avx2": "5d4387a643047a4584592b5c4ad2ff9cbf8c2210013c88f1b1f49b292a8027d1"
   },
   "github_only_artifacts": {
-    "llama-modchip-v3.2.0-linux-x86_64.tar.gz": "5f3cd4d73e7407817d6da2680150f27202d85291275d56221502709782d5ed1c"
+    "llama-modchip-v3.2.1-linux-x86_64.tar.gz": "652dd445c4a3d47fa36f3e81e832d3a75b95429ded5e9c3ef676d26fbfa01dc0"
   },
   "benchmarks": [
     {

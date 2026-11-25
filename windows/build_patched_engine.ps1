@@ -58,7 +58,7 @@ try {
     }
     Write-Host "[*] Resetting working tree ..." -ForegroundColor Cyan
     & $git checkout -q -- .
-    foreach ($f in "ggml\src\vq3_codebook.h", "common\rc_predictor.h", "common\rc_stockfish.h", "common\rc_trie_v2.h", "common\rc_arbiter_l1.h", "common\rc_routecrack2.h", "tools\server\rc_harp_radix.h") {
+    foreach ($f in "ggml\src\vq3_codebook.h", "common\rc_predictor.h", "common\rc_stockfish.h", "common\rc_trie_v2.h", "common\rc_arbiter_l1.h", "common\rc_routecrack2.h", "src\llama-inkling2-fused.h", "tools\server\rc_harp_radix.h") {
         Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $LlamaDir $f)
     }
 

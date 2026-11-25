@@ -1,6 +1,40 @@
-# Release Notes — `llama-modchip` (`v3.2.0`)
+# Release Notes — `llama-modchip` (`v3.2.1`)
 
 > **Quick Links:** [Overview (`README.md`)](README.md) · [LUT-VQ3-64 & MaxQ-v4 Quality Gate (`benchmarks/QUALITY_GATE_VQ3_64.md`)](benchmarks/QUALITY_GATE_VQ3_64.md) · [Technical Architecture (`ARCHITECTURE.md`)](ARCHITECTURE.md) · [Windows Port & Hybrid Pack (`windows/README.md`)](windows/README.md) · [Fractal-MoE Quality Gate (`benchmarks/FRACTAL_MOE_QUALITY_GATE.md`)](benchmarks/FRACTAL_MOE_QUALITY_GATE.md) · [`RouteCrack 2.0` Techniques (`speculative/ROUTECRACK_TECHNIQUES.md`)](speculative/ROUTECRACK_TECHNIQUES.md) · [Engineering FAQ (`FAQ.md`)](FAQ.md)
+
+---
+
+## `v3.2.1` — Zero-Drift `Inkling-2-Mini` AVX-512 Graph Fusion (`+49.8%` Prefill / `+20.7%` Decode), Non-Temporal `mul_mat` Streaming (`LLAMA_NT_STREAM_MM=1`), & `11.3×` Batched HARP-Cache Acceleration
+
+**Release Date:** November 2026  
+**Highlights:**
+1. **Zero-Drift `Inkling-2-Mini` AVX-512 Graph Fusion (`src/llama-inkling2-fused.h`, `src/models/inkling2.cpp`, `src/llama-graph.cpp`, `MODCHIP_INK2_FUSE=1`)**:
+   - Collapses `~4,300+` per-token cross-CCD threadpool barriers and intermediate DRAM passes on looped `Inkling-2` / `Inkling-2-Mini` graphs at **`0.0000` PPL drift**: fused SiTU activation (`LLM_FFN_SITU`, 9 -> 1 node), L2 row clip + scale + log-tau (7–10 -> 1 node), depth-attention `mix()` (10–16 -> 1 node), shortconv + 4-lag dynamic taps + residual scale (3–23 -> 1 node), loop-control dual-RMS + mix (10 -> 2 nodes), gated attention `cur * sigmoid(g)` (2 -> 1 node), relative-bias gather `kq_b` (7 -> 1 node), final logit softcap + unpad (4 -> 1 node), and fused sigmoid MoE router top-k + weight normalization (7 -> 2 ops), plus Q8 activation cache projection grouping and `zero_sinks` reuse.
+   - Uses runtime AVX-512F/DQ/FMA dispatch (`__builtin_cpu_supports`) with clean scalar fallback and compile-time `-DMODCHIP_INK2_DISABLE_AVX512` isolation on `-avx2` portable builds (`0` `%zmm` in `-avx2`).
+   - **Automatic GPU-Offload Safety (`modchip_ink2::tensor_on_cpu`):** Verifies tensors reside on `GGML_BACKEND_DEVICE_TYPE_CPU` (compatible with `--repack` / `CPU_REPACK`) before inserting CPU custom ops, ensuring zero GPU<->CPU sync stalls on Apple Silicon Metal, CUDA, and Vulkan offloaded runs.
+   - **Verified Zen 5 CPU Speedup (`MODCHIP_INK2_FUSE=1` + `LLAMA_NT_STREAM_MM=1`, `0.0000` PPL drift):** **`+49.8%`** prompt prefill and **`+20.7%`** decode throughput on `Inkling-2-Mini`.
+2. **Non-Temporal Decode Streaming for Large `mul_mat` Matrices (`ggml/src/ggml-cpu/ggml-cpu.c`, `LLAMA_NT_STREAM_MM=1`)**:
+   - Enables non-temporal (`_MM_HINT_NTA`) weight streaming on decode (`nr1 <= 4`) for large weight matrices (`>= 4 MiB`, e.g., `lm_head` and large `Q8_0` attention projections) so single-use weight sweeps never evict KV caches, conv states, or hot norms from L3 cache, and widens `nr0 >= 32768` decode chunking to `chunk_size = 512` (`LLAMA_NT_STREAM_MM=0` disables for A/B testing).
+   - Updated unified [`patches/llama-modchip-v3.2.patch`](patches/llama-modchip-v3.2.patch) cleanly onto `ggml-org/llama.cpp @ 46eb1742d` (`b12604`, `SHA256 = c6d1b07b5abd97388637fced26571cf0d4b0d9c3452e00b008d70732450eafd6`) — verified 156/156 `test-llama-archs` PASS (including `inkling2` & `inkling2_loop` at `0.00e+00` NMSE) and 3,059/3,059 `test-backend-ops` `MUL_MAT` PASS.
+3. **Community Runtime, KV-Cache & Gateway Hardening (PRs `#51`, `#53`–`#61`)**:
+   - **`11.3×` Faster Python HARP-Cache Hashing & O(1) Radix Eviction (`kv_cache/fnv_accel.py`, `kv_cache/harp_cache.py`, PRs `#56`, `#59`, `#61`):** Native + batched FNV-1a hashing, O(1) radix tree parent tracking, direct LRU scanning, struct packing, full radix-depth collision eviction, and anonymous fallback `close()` guard (`#51`).
+   - **Vectorized EAKV Quantizer (`kv_cache/eakv_quantizer.py`, PR `#55`):** Vectorized RoPE rotation, batched `Q4_0` quantization, and LUT unpacking.
+   - **Gateway, Readiness, Speculative & Apple Silicon Polish (PRs `#53`, `#54`, `#57`, `#58`, `#60`):** Distinct content-block indices for native thinking in SSE gateway (`#58`), accurate macOS `vm_stat` available memory (`#54`), C++17 strict-fail RouteCrack build (`#60`), and graceful offline error handling in `scripts/chat.py` & `apple-silicon/` tools (`#53`, `#57`).
+   - **Zero GGUF checkpoint changes** — all `v3.0` / `v3.1.1` / `v3.2.0` GGUF SHA-256s remain 100% identical.
+4. **12 Rebuilt Static-`libgomp` Portable `GLIBC_2.30` Linux `x86_64` Binaries, Tarball & Patch (`v3.2.1` `SHA256SUMS`)**:
+   - Built on `ubuntu:20.04` (`gcc-10/g++-10`, `GLIBC <= 2.30`, static `libgomp.a` + `libstdc++.a` + `libgcc.a`, `0` `%zmm` in `-avx2`, `0` `vdpbf16ps` in `-avx512`, `0` dynamic `libgomp`/`libstdc++`/`libssl` dependencies):
+     - `c6d1b07b5abd97388637fced26571cf0d4b0d9c3452e00b008d70732450eafd6  llama-modchip-v3.2.patch`
+     - `72f88dccd6f8b067e8bddf0a8beb246d7e955c0a87da5e6d997f74089695c6a7  llama-server-modchip-linux-x86_64-avx512`
+     - `94e349d7cd70fcc7812ee02d7a323afff141e2ee604cb7c2f79c18ddf6136493  llama-server-modchip-linux-x86_64-avx2` *(and `llama-server-modchip-linux-x86_64`)*
+     - `377a62c728260f06cd9cb155d524831d36e29377d2f428855e160358851d4b41  llama-cli-modchip-linux-x86_64-avx512`
+     - `ae5cd7e0f684f89f5b0114f9ddf84779ede68345d46ca330e9cc3846a4805067  llama-cli-modchip-linux-x86_64-avx2` *(and `llama-cli-modchip-linux-x86_64`)*
+     - `309a515e4fba7832d6c47313dab7bc6ea06d9a1af1a39bf62c6e559f09993869  llama-bench-modchip-linux-x86_64-avx512`
+     - `a447f76f61a37c2a18763b3089eec109e94fc89126172f4fd5c1239ac20ce4f2  llama-bench-modchip-linux-x86_64-avx2`
+     - `9792b8594ac3cd355e0207abf3401567c879d45e4140755c40aecf4417af4761  llama-perplexity-modchip-linux-x86_64-avx512`
+     - `2d016b9583c41c77f2cb61366453432fe9818e47907f1066ab5a2a88f8762a5d  llama-perplexity-modchip-linux-x86_64-avx2`
+     - `8d809463e3d1e9a3c2bb2fcfd21b43b54765dce0e54d5559d9183dc7c702b828  llama-quantize-modchip-linux-x86_64-avx512`
+     - `5d4387a643047a4584592b5c4ad2ff9cbf8c2210013c88f1b1f49b292a8027d1  llama-quantize-modchip-linux-x86_64-avx2`
+     - `652dd445c4a3d47fa36f3e81e832d3a75b95429ded5e9c3ef676d26fbfa01dc0  llama-modchip-v3.2.1-linux-x86_64.tar.gz`
 
 ---
 

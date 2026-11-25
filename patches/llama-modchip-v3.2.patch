@@ -9858,7 +9858,7 @@ index f8b3637..24fea69 100644
  }
  #endif
 diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
-index 4d9760b..7e5e56b 100644
+index 4d9760b..05a7019 100644
 --- a/ggml/src/ggml-cpu/ggml-cpu.c
 +++ b/ggml/src/ggml-cpu/ggml-cpu.c
 @@ -1,3 +1,30 @@
@@ -10394,7 +10394,30 @@ index 4d9760b..7e5e56b 100644
          const size_t row_size = ggml_row_size(vec_dot_type, ne10);
  
          for (int64_t i13 = 0; i13 < ne13; i13++)
-@@ -1442,7 +1784,15 @@ UseGgmlGemm2:;
+@@ -1430,7 +1772,21 @@ UseGgmlGemm2:;
+ 
+     // We need to step up the size if it's small
+     if (nr0 == 1 || nr1 == 1) {
+-        chunk_size = 64;
++        chunk_size = (nr1 == 1 && nr0 >= 32768) ? 512 : 64;
++    }
++
++    // Stream large weight matrices (e.g. lm_head, large Q8_0 attn weights) via NTA on decode
++    // so they never evict KV cache / conv states / hot norms from L3 cache.
++    static atomic_int s_nt_stream_mm = -1;
++    int nt_stream_mm = atomic_load_explicit(&s_nt_stream_mm, memory_order_relaxed);
++    if (nt_stream_mm < 0) {
++        const char * env_mm = getenv("LLAMA_NT_STREAM_MM");
++        nt_stream_mm = (!env_mm || env_mm[0] == '\0' || atoi(env_mm) != 0) ? 1 : 0;
++        atomic_store_explicit(&s_nt_stream_mm, nt_stream_mm, memory_order_relaxed);
++    }
++    const bool prev_nt_active = ggml_cpu_nt_stream_active;
++    if (nt_stream_mm && nr1 <= 4 && ggml_nbytes(src0) >= (size_t) (4 * 1024 * 1024)) {
++        ggml_cpu_nt_stream_active = true;
+     }
+ 
+     // distribute the work across the inner or outer loop based on which one is larger
+@@ -1442,7 +1798,15 @@ UseGgmlGemm2:;
      // If the chunking is poor for the number of threads on this setup, scrap the whole plan.  Re-chunk it by thread.
      //   Also, chunking by thread was measured to have perform better on NUMA systems.  See https://github.com/ggml-org/llama.cpp/pull/6915
      //   In theory, chunking should be just as useful on NUMA and non NUMA systems, but testing disagreed with that.
@@ -10411,7 +10434,15 @@ index 4d9760b..7e5e56b 100644
          // distribute the thread work across the inner or outer loop based on which one is larger
          nchunk0 = nr0 > nr1 ? nth : 1; // parallelize by src0 rows
          nchunk1 = nr0 > nr1 ? 1 : nth; // parallelize by src1 rows
-@@ -1520,6 +1870,110 @@ static void ggml_compute_forward_mul_mat_id_one_chunk(
+@@ -1481,6 +1845,7 @@ UseGgmlGemm2:;
+ 
+         current_chunk = atomic_fetch_add_explicit(&params->threadpool->current_chunk, 1, memory_order_relaxed);
+     }
++    ggml_cpu_nt_stream_active = prev_nt_active;
+ }
+ 
+ // ggml_compute_forward_mul_mat_id
+@@ -1520,6 +1885,110 @@ static void ggml_compute_forward_mul_mat_id_one_chunk(
  
      float tmp[16];
  
@@ -10522,7 +10553,7 @@ index 4d9760b..7e5e56b 100644
      for (int64_t iir1 = ir1_start; iir1 < ir1_end; iir1 += blck_1) {
          for (int64_t iir0 = ir0_start; iir0 < ir0_end; iir0 += blck_0) {
              for (int64_t ir1 = iir1; ir1 < iir1 + blck_1 && ir1 < ir1_end; ++ir1) {
-@@ -1546,6 +2000,24 @@ static void ggml_compute_forward_mul_mat_id_one_chunk(
+@@ -1546,6 +2015,24 @@ static void ggml_compute_forward_mul_mat_id_one_chunk(
                  float * dst_col = (float *) ((char *) dst->data + (i1*nb1 + i2*nb2));
  
                  for (int64_t ir0 = iir0; ir0 < iir0 + blck_0 && ir0 < ir0_end; ++ir0) {
@@ -10547,7 +10578,7 @@ index 4d9760b..7e5e56b 100644
                      vec_dot(ne00, &tmp[ir0 - iir0], 0, src0_cur + ir0*nb01, 0, src1_col, 0, 1);
                  }
  
-@@ -1609,6 +2081,10 @@ static void ggml_compute_forward_mul_mat_id(
+@@ -1609,6 +2096,10 @@ static void ggml_compute_forward_mul_mat_id(
      int64_t * matrix_row_counts = // [n_as]
          incr_ptr_aligned(&wdata_cur, n_as*sizeof(int64_t), sizeof(int64_t));
  
@@ -10558,7 +10589,7 @@ index 4d9760b..7e5e56b 100644
      struct mmid_row_mapping * matrix_rows = // [n_as][ids->ne[0]*ids->ne[1]]
          incr_ptr_aligned(&wdata_cur, n_as*ids->ne[0]*ids->ne[1]*sizeof(struct mmid_row_mapping), sizeof(int64_t));
  
-@@ -1617,54 +2093,60 @@ static void ggml_compute_forward_mul_mat_id(
+@@ -1617,54 +2108,60 @@ static void ggml_compute_forward_mul_mat_id(
  
      // Tiled matmul (see tiled.h); per-thread work buffers, 0 bytes when disabled. The
      // reservation is unconditional, the per expert eligibility is decided at dispatch time
@@ -10644,7 +10675,7 @@ index 4d9760b..7e5e56b 100644
                  const int32_t i02 = *(const int32_t *) ((const char *) ids->data + iid1*ids->nb[1] + id*ids->nb[0]);
  
                  assert(i02 == -1 || (i02 >= 0 && i02 < n_as));
-@@ -1678,17 +2160,89 @@ static void ggml_compute_forward_mul_mat_id(
+@@ -1678,17 +2175,89 @@ static void ggml_compute_forward_mul_mat_id(
                  matrix_row_counts[i02] += 1;
              }
          }
@@ -10668,9 +10699,8 @@ index 4d9760b..7e5e56b 100644
 +            atomic_int * current_chunk_ctr = (atomic_int *)(atomic_current_chunk + cur_a);
 +            *current_chunk_ctr = nth;
 +        }
-     }
- 
--    ggml_barrier(params->threadpool);
++    }
++
 +    if (!g_tls_q8_valid || !g_tls_mmid_ids_valid || ids->ne[1] > 1 || ((ne01 + 63) / 64) >= nth * 4) {
 +        ggml_barrier(params->threadpool);
 +    }
@@ -10689,11 +10719,13 @@ index 4d9760b..7e5e56b 100644
 +        const char * env = getenv("LLAMA_NT_STREAM");
 +        nt_stream = (!env || env[0] == '\0' || atoi(env) != 0) ? 1 : 0;
 +        atomic_store_explicit(&s_nt_stream, nt_stream, memory_order_relaxed);
-+    }
+     }
 +    ggml_cpu_nt_stream_active = (nt_stream != 0 && n_as >= 64 && ids->ne[1] <= 8);
-+
+ 
+-    ggml_barrier(params->threadpool);
 +    const int n_active = active_info[0];
-+
+ 
+-    for (int cur_a = 0; cur_a < n_as; ++cur_a) {
 +    static atomic_int s_tiled_mm_force = -1;
 +    int tiled_force = atomic_load_explicit(&s_tiled_mm_force, memory_order_relaxed);
 +    if (tiled_force < 0) {
@@ -10701,8 +10733,7 @@ index 4d9760b..7e5e56b 100644
 +        tiled_force = (env_tf && atoi(env_tf) != 0) ? 1 : 0;
 +        atomic_store_explicit(&s_tiled_mm_force, tiled_force, memory_order_relaxed);
 +    }
- 
--    for (int cur_a = 0; cur_a < n_as; ++cur_a) {
++
 +    if (ids->ne[1] >= 2 && ne01 >= 256 && (tiled_wsize == 0 || (ids->ne[1] < 8 && !tiled_force))) {
 +        const void * wdata = (src1->type == vec_dot_type) ? src1->data : wdata_q8;
 +        const size_t row_size = ggml_row_size(vec_dot_type, ne10);
@@ -10740,7 +10771,7 @@ index 4d9760b..7e5e56b 100644
          const int64_t cne1 = matrix_row_counts[cur_a];
  
          if (cne1 == 0) {
-@@ -1701,7 +2255,7 @@ static void ggml_compute_forward_mul_mat_id(
+@@ -1701,7 +2270,7 @@ static void ggml_compute_forward_mul_mat_id(
          }
  
          const char * src0_cur = (const char *) src0->data + cur_a * nb02;
@@ -10749,7 +10780,7 @@ index 4d9760b..7e5e56b 100644
          const size_t row_size = ggml_row_size(vec_dot_type, ne10);
  
          const int64_t nr0 = ne01;
-@@ -1718,12 +2272,15 @@ static void ggml_compute_forward_mul_mat_id(
+@@ -1718,12 +2287,15 @@ static void ggml_compute_forward_mul_mat_id(
          int64_t nchunk0 = (nr0 + chunk_size - 1) / chunk_size;
          int64_t nchunk1 = (nr1 + chunk_size - 1) / chunk_size;
  
@@ -10767,7 +10798,7 @@ index 4d9760b..7e5e56b 100644
          const int64_t dr1 = (nr1 + nchunk1 - 1) / nchunk1;
  
          int current_chunk = ith;
-@@ -1740,11 +2297,13 @@ static void ggml_compute_forward_mul_mat_id(
+@@ -1740,11 +2312,13 @@ static void ggml_compute_forward_mul_mat_id(
              const int64_t ir1_start = dr1 * ith1;
              const int64_t ir1_end = MIN(ir1_start + dr1, nr1);
  
@@ -10786,7 +10817,7 @@ index 4d9760b..7e5e56b 100644
  
              if (nth >= nchunk0 * nchunk1) {
                  break;
-@@ -1753,6 +2312,7 @@ static void ggml_compute_forward_mul_mat_id(
+@@ -1753,6 +2327,7 @@ static void ggml_compute_forward_mul_mat_id(
              current_chunk = atomic_fetch_add_explicit(current_chunk_ctr, 1, memory_order_relaxed);
          }
      }
@@ -10794,7 +10825,7 @@ index 4d9760b..7e5e56b 100644
  }
  
  /////////////////////////////////
-@@ -2299,8 +2859,18 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
+@@ -2299,8 +2874,18 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
              } break;
          case GGML_OP_COUNT_EQUAL:
          case GGML_OP_SOLVE_TRI:
@@ -10813,7 +10844,7 @@ index 4d9760b..7e5e56b 100644
          case GGML_OP_DSV4_HC_PRE:
          case GGML_OP_DSV4_HC_POST:
          case GGML_OP_TOP_K_MASK:
-@@ -2383,8 +2953,9 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
+@@ -2383,8 +2968,9 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
              } break;
          case GGML_OP_GET_ROWS:
              {
@@ -10825,7 +10856,7 @@ index 4d9760b..7e5e56b 100644
              } break;
          case GGML_OP_SCALE:
          case GGML_OP_SET:
-@@ -2916,6 +3487,8 @@ struct ggml_cplan ggml_graph_plan(
+@@ -2916,6 +3502,8 @@ struct ggml_cplan ggml_graph_plan(
                          }
                          // matrix_row_counts
                          cur += n_as * sizeof(int64_t) + sizeof(int64_t);
@@ -10834,7 +10865,7 @@ index 4d9760b..7e5e56b 100644
                          // matrix_rows
                          cur += n_as*ids->ne[0]*ids->ne[1]*sizeof(struct mmid_row_mapping) + sizeof(int64_t);
                          // atomic_current_chunk
-@@ -3008,9 +3581,9 @@ struct ggml_cplan ggml_graph_plan(
+@@ -3008,9 +3596,9 @@ struct ggml_cplan ggml_graph_plan(
                          size_t prefill  = sizeof(float)*(GGML_FA_TILE_Q*DK + 2*GGML_FA_TILE_Q*GGML_FA_TILE_KV + GGML_FA_TILE_Q*DV + GGML_FA_TILE_KV*DV + GGML_FA_TILE_KV*DK)*n_tasks;
  
                          // Decode path: n_kv_chunks = n_tasks (one chunk per thread)
@@ -10846,7 +10877,7 @@ index 4d9760b..7e5e56b 100644
  
                          cur += MAX(prefill, decode);
                      } break;
-@@ -3039,7 +3612,7 @@ struct ggml_cplan ggml_graph_plan(
+@@ -3039,7 +3627,7 @@ struct ggml_cplan ggml_graph_plan(
                      {
                          const int64_t S_v = node->src[2]->ne[0];
                          const int64_t K   = ggml_get_op_params_i32(node, 0);
@@ -10855,7 +10886,7 @@ index 4d9760b..7e5e56b 100644
                          cur = per_thread * sizeof(float) * n_tasks;
                      } break;
                  case GGML_OP_COUNT:
-@@ -3111,6 +3684,66 @@ static int ggml_cpu_try_fuse_ops(
+@@ -3111,6 +3699,66 @@ static int ggml_cpu_try_fuse_ops(
      return 0;
  }
  
@@ -10922,7 +10953,7 @@ index 4d9760b..7e5e56b 100644
  static thread_ret_t ggml_graph_compute_thread(void * data) {
      struct ggml_compute_state * state = (struct ggml_compute_state *) data;
      struct ggml_threadpool    * tp    = state->threadpool;
-@@ -3139,9 +3772,124 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
+@@ -3139,9 +3787,124 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
      GGML_PRINT_DEBUG("thread #%d compute-start cplan %p last-graph %d\n", state->ith, (const void *)cplan, state->last_graph);
  #endif
  
@@ -11047,7 +11078,7 @@ index 4d9760b..7e5e56b 100644
          if (ggml_op_is_empty(node->op)) {
              // skip NOPs
              continue;
-@@ -3151,13 +3899,192 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
+@@ -3151,13 +3914,192 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
              continue;
          }
  
@@ -11240,7 +11271,7 @@ index 4d9760b..7e5e56b 100644
          }
  
          if (state->ith == 0 && cplan->abort_callback &&
-@@ -3169,6 +4096,117 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
+@@ -3169,6 +4111,117 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
          if (node_n + 1 < cgraph->n_nodes) {
              ggml_barrier(state->threadpool);
          }
@@ -11358,7 +11389,7 @@ index 4d9760b..7e5e56b 100644
      }
  
  #ifdef GGML_USE_OPENMP
-@@ -3338,6 +4376,8 @@ static struct ggml_threadpool * ggml_threadpool_new_impl(
+@@ -3338,6 +4391,8 @@ static struct ggml_threadpool * ggml_threadpool_new_impl(
          threadpool->n_barrier        = 0;
          threadpool->n_barrier_passed = 0;
          threadpool->current_chunk    = 0;
@@ -11367,7 +11398,7 @@ index 4d9760b..7e5e56b 100644
          threadpool->stop             = false;
          threadpool->pause            = tpp->paused;
          threadpool->abort            = -1;
-@@ -3430,7 +4470,118 @@ enum ggml_status ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cpl
+@@ -3430,7 +4485,118 @@ enum ggml_status ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cpl
      }
  
  #ifdef GGML_USE_OPENMP
@@ -11487,7 +11518,7 @@ index 4d9760b..7e5e56b 100644
          #pragma omp parallel num_threads(n_threads)
          {
              #pragma omp single
-@@ -3446,6 +4597,25 @@ enum ggml_status ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cpl
+@@ -3446,6 +4612,25 @@ enum ggml_status ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cpl
              ggml_thread_apply_priority(threadpool->prio);
              if (ggml_thread_cpumask_is_valid(threadpool->workers[ith].cpumask)) {
                  ggml_thread_apply_affinity(threadpool->workers[ith].cpumask);
@@ -14943,10 +14974,272 @@ index 7122143..f4b1a0b 100644
      // Get the model file type (quantization) as a string, e.g. "Q8_0" or "Q4_K - Medium"
      LLAMA_API const char * llama_ftype_name(enum llama_ftype ftype);
 diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
-index 269b920..0841b1b 100644
+index 269b920..70c042e 100644
 --- a/src/llama-graph.cpp
 +++ b/src/llama-graph.cpp
-@@ -2775,7 +2775,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+@@ -1,4 +1,5 @@
+ #include "llama-graph.h"
++#include "llama-inkling2-fused.h"
+ 
+ #include "llama-impl.h"
+ #include "llama-model.h"
+@@ -2443,103 +2444,145 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+     }
+     cb(probs, "ffn_moe_probs", il);
+ 
+-    // add experts selection bias - introduced in DeepSeek V3
+-    // leave probs unbiased as it's later used to get expert weights
+-    ggml_tensor * selection_probs = probs;
+-    if (exp_probs_b != nullptr) {
+-        selection_probs = ggml_add(ctx0, probs, exp_probs_b);
+-        cb(selection_probs, "ffn_moe_probs_biased", il);
+-    }
++    // Fast fused Sigmoid MoE router top-k + weight normalization (CPU-resident layers)
++    // Replaces 7 tiny barrier nodes -> 2 single-core ops while preserving router `probs`.
++    const bool use_fused_sigmoid_router =
++        modchip_ink2::fusion_enabled(9) &&
++        modchip_ink2::tensor_on_cpu(gate_inp) &&
++        gating_op == LLAMA_EXPERT_GATING_FUNC_TYPE_SIGMOID &&
++        hparams.n_expert_groups <= 1 &&
++        selected_experts_in == nullptr &&
++        arch != LLM_ARCH_LLAMA4 &&
++        arch != LLM_ARCH_GROVEMOE &&
++        n_expert_used <= 64 &&
++        probs->type == GGML_TYPE_F32 &&
++        (!exp_probs_b || exp_probs_b->type == GGML_TYPE_F32);
+ 
+-    // llama4 doesn't have exp_probs_b, and sigmoid is only used after top_k
+-    // see: https://github.com/meta-llama/llama-models/blob/699a02993512fb36936b1b0741e13c06790bcf98/models/llama4/moe.py#L183-L198
+-    if (arch == LLM_ARCH_LLAMA4) {
+-        selection_probs = logits;
+-    }
++    ggml_tensor * selected_experts = selected_experts_in;
++    ggml_tensor * weights          = nullptr;
++
++    if (use_fused_sigmoid_router) {
++        ggml_tensor * idx_args[2] = { probs, exp_probs_b };
++        const int n_idx_args = exp_probs_b ? 2 : 1;
++        const int n_tasks_r  = modchip_ink2::choose_n_tasks(n_expert * n_tokens, n_tokens);
++        selected_experts = ggml_custom_4d(
++                ctx0, GGML_TYPE_I32,
++                n_expert_used, n_tokens, 1, 1,
++                idx_args, n_idx_args,
++                modchip_ink2::fused_moe_probs_topk_idx_op,
++                n_tasks_r,
++                nullptr);
++        cb(selected_experts, "ffn_moe_topk", il);
++
++        ggml_tensor * w_args[2] = { probs, selected_experts };
++        const float norm_eps = (arch == LLM_ARCH_DEEPSEEK41) ? 1e-20f : hparams.expert_weights_norm_eps;
++        weights = ggml_custom_4d(
++                ctx0, GGML_TYPE_F32,
++                1, n_expert_used, n_tokens, 1,
++                w_args, 2,
++                modchip_ink2::fused_moe_topk_norm_w_op,
++                n_tasks_r,
++                modchip_ink2::intern_moe_router_w_params(norm_w ? 1 : 0, norm_eps, w_scale));
++        cb(weights, "ffn_moe_weights_scaled", il);
++        probs = ggml_reshape_3d(ctx0, probs, 1, n_expert, n_tokens);
++    } else {
++        // add experts selection bias - introduced in DeepSeek V3
++        // leave probs unbiased as it's later used to get expert weights
++        ggml_tensor * selection_probs = probs;
++        if (exp_probs_b != nullptr) {
++            selection_probs = ggml_add(ctx0, probs, exp_probs_b);
++            cb(selection_probs, "ffn_moe_probs_biased", il);
++        }
+ 
+-    if (arch == LLM_ARCH_GROVEMOE) {
+-        selection_probs = ggml_sigmoid(ctx0, logits); // [n_expert, n_tokens]
+-        cb(selection_probs, "ffn_moe_probs_biased", il);
+-    }
++        // llama4 doesn't have exp_probs_b, and sigmoid is only used after top_k
++        // see: https://github.com/meta-llama/llama-models/blob/699a02993512fb36936b1b0741e13c06790bcf98/models/llama4/moe.py#L183-L198
++        if (arch == LLM_ARCH_LLAMA4) {
++            selection_probs = logits;
++        }
+ 
+-    // select top n_group_used expert groups
+-    // https://huggingface.co/deepseek-ai/DeepSeek-V3/blob/e815299b0bcbac849fa540c768ef21845365c9eb/modeling_deepseek.py#L440-L457
+-    if (hparams.n_expert_groups > 1 && n_tokens > 0) {
+-        const int64_t n_exp_per_group = n_expert / hparams.n_expert_groups;
++        if (arch == LLM_ARCH_GROVEMOE) {
++            selection_probs = ggml_sigmoid(ctx0, logits); // [n_expert, n_tokens]
++            cb(selection_probs, "ffn_moe_probs_biased", il);
++        }
+ 
+-        // organize experts into n_expert_groups
+-        ggml_tensor * selection_groups = ggml_reshape_3d(ctx0, selection_probs, n_exp_per_group, hparams.n_expert_groups, n_tokens); // [n_exp_per_group, n_expert_groups, n_tokens]
++        // select top n_group_used expert groups
++        // https://huggingface.co/deepseek-ai/DeepSeek-V3/blob/e815299b0bcbac849fa540c768ef21845365c9eb/modeling_deepseek.py#L440-L457
++        if (hparams.n_expert_groups > 1 && n_tokens > 0) {
++            const int64_t n_exp_per_group = n_expert / hparams.n_expert_groups;
+ 
+-        ggml_tensor * group_scores = ggml_argsort_top_k(ctx0, selection_groups, 2); // [2, n_expert_groups, n_tokens]
+-        group_scores = ggml_get_rows(ctx0, ggml_reshape_4d(ctx0, selection_groups, 1, selection_groups->ne[0], selection_groups->ne[1], selection_groups->ne[2]), group_scores); // [1, 2, n_expert_groups, n_tokens]
++            // organize experts into n_expert_groups
++            ggml_tensor * selection_groups = ggml_reshape_3d(ctx0, selection_probs, n_exp_per_group, hparams.n_expert_groups, n_tokens); // [n_exp_per_group, n_expert_groups, n_tokens]
+ 
+-        // get top n_group_used expert groups
+-        group_scores = ggml_sum_rows(ctx0, ggml_reshape_3d(ctx0, group_scores, group_scores->ne[1], group_scores->ne[2], group_scores->ne[3])); // [1, n_expert_groups, n_tokens]
+-        group_scores = ggml_reshape_2d(ctx0, group_scores, group_scores->ne[1], group_scores->ne[2]); // [n_expert_groups, n_tokens]
++            ggml_tensor * group_scores = ggml_argsort_top_k(ctx0, selection_groups, 2); // [2, n_expert_groups, n_tokens]
++            group_scores = ggml_get_rows(ctx0, ggml_reshape_4d(ctx0, selection_groups, 1, selection_groups->ne[0], selection_groups->ne[1], selection_groups->ne[2]), group_scores); // [1, 2, n_expert_groups, n_tokens]
+ 
+-        ggml_tensor * expert_groups = ggml_argsort_top_k(ctx0, group_scores, hparams.n_group_used); // [n_group_used, n_tokens]
+-        cb(expert_groups, "ffn_moe_group_topk", il);
++            // get top n_group_used expert groups
++            group_scores = ggml_sum_rows(ctx0, ggml_reshape_3d(ctx0, group_scores, group_scores->ne[1], group_scores->ne[2], group_scores->ne[3])); // [1, n_expert_groups, n_tokens]
++            group_scores = ggml_reshape_2d(ctx0, group_scores, group_scores->ne[1], group_scores->ne[2]); // [n_expert_groups, n_tokens]
+ 
+-        // mask out the other groups
+-        selection_probs = ggml_get_rows(ctx0, selection_groups, expert_groups); // [n_exp_per_group, n_group_used, n_tokens]
+-        selection_probs = ggml_set_rows(ctx0, ggml_fill(ctx0, selection_groups, -INFINITY), selection_probs, expert_groups); // [n_exp_per_group, n_expert_groups, n_tokens]
+-        selection_probs = ggml_reshape_2d(ctx0, selection_probs, n_expert, n_tokens); // [n_expert, n_tokens]
+-        cb(selection_probs, "ffn_moe_probs_masked", il);
+-    }
++            ggml_tensor * expert_groups = ggml_argsort_top_k(ctx0, group_scores, hparams.n_group_used); // [n_group_used, n_tokens]
++            cb(expert_groups, "ffn_moe_group_topk", il);
+ 
+-    // select experts
+-    ggml_tensor * selected_experts = selected_experts_in;
+-    if (selected_experts == nullptr) {
+-        selected_experts = ggml_argsort_top_k(ctx0, selection_probs, n_expert_used); // [n_expert_used, n_tokens]
+-        cb(selected_experts->src[0], "ffn_moe_argsort", il);
+-    }
+-    cb(selected_experts, "ffn_moe_topk", il);
++            // mask out the other groups
++            selection_probs = ggml_get_rows(ctx0, selection_groups, expert_groups); // [n_exp_per_group, n_group_used, n_tokens]
++            selection_probs = ggml_set_rows(ctx0, ggml_fill(ctx0, selection_groups, -INFINITY), selection_probs, expert_groups); // [n_exp_per_group, n_expert_groups, n_tokens]
++            selection_probs = ggml_reshape_2d(ctx0, selection_probs, n_expert, n_tokens); // [n_expert, n_tokens]
++            cb(selection_probs, "ffn_moe_probs_masked", il);
++        }
+ 
+-    if (arch == LLM_ARCH_GROVEMOE && n_expert != hparams.n_expert) {
+-        // TODO: Use scalar div instead when/if implemented
+-        ggml_tensor * f_sel = ggml_cast(ctx0, selected_experts, GGML_TYPE_F32);
+-        selected_experts = ggml_cast(ctx0, ggml_scale(ctx0, f_sel, 1.0f / float(hparams.n_group_experts)), GGML_TYPE_I32);
+-        probs = ggml_reshape_3d(ctx0, probs, 1, hparams.n_expert, n_tokens);
+-    } else {
+-        probs = ggml_reshape_3d(ctx0, probs, 1, n_expert, n_tokens);
+-    }
++        // select experts
++        if (selected_experts == nullptr) {
++            selected_experts = ggml_argsort_top_k(ctx0, selection_probs, n_expert_used); // [n_expert_used, n_tokens]
++            cb(selected_experts->src[0], "ffn_moe_argsort", il);
++        }
++        cb(selected_experts, "ffn_moe_topk", il);
+ 
+-    ggml_tensor * weights = ggml_get_rows(ctx0, probs, selected_experts); // [1, n_expert_used, n_tokens]
+-    cb(weights, "ffn_moe_weights", il);
++        if (arch == LLM_ARCH_GROVEMOE && n_expert != hparams.n_expert) {
++            // TODO: Use scalar div instead when/if implemented
++            ggml_tensor * f_sel = ggml_cast(ctx0, selected_experts, GGML_TYPE_F32);
++            selected_experts = ggml_cast(ctx0, ggml_scale(ctx0, f_sel, 1.0f / float(hparams.n_group_experts)), GGML_TYPE_I32);
++            probs = ggml_reshape_3d(ctx0, probs, 1, hparams.n_expert, n_tokens);
++        } else {
++            probs = ggml_reshape_3d(ctx0, probs, 1, n_expert, n_tokens);
++        }
+ 
++        weights = ggml_get_rows(ctx0, probs, selected_experts); // [1, n_expert_used, n_tokens]
++        cb(weights, "ffn_moe_weights", il);
+ 
+-    if (gating_op == LLAMA_EXPERT_GATING_FUNC_TYPE_SOFTMAX_WEIGHT) {
+-        weights = ggml_reshape_2d(ctx0, weights, n_expert_used, n_tokens);
+-        weights = ggml_soft_max(ctx0, weights); // [n_expert_used, n_tokens]
+-        weights = ggml_reshape_3d(ctx0, weights, 1, n_expert_used, n_tokens);
+-        cb(weights, "ffn_moe_weights_softmax", il);
+-    }
+ 
+-    if (norm_w) {
+-        weights = ggml_reshape_2d(ctx0, weights, n_expert_used, n_tokens);
++        if (gating_op == LLAMA_EXPERT_GATING_FUNC_TYPE_SOFTMAX_WEIGHT) {
++            weights = ggml_reshape_2d(ctx0, weights, n_expert_used, n_tokens);
++            weights = ggml_soft_max(ctx0, weights); // [n_expert_used, n_tokens]
++            weights = ggml_reshape_3d(ctx0, weights, 1, n_expert_used, n_tokens);
++            cb(weights, "ffn_moe_weights_softmax", il);
++        }
+ 
+-        ggml_tensor * weights_sum = ggml_sum_rows(ctx0, weights); // [1, n_tokens]
+-        cb(weights_sum, "ffn_moe_weights_sum", il);
++        if (norm_w) {
++            weights = ggml_reshape_2d(ctx0, weights, n_expert_used, n_tokens);
+ 
+-        if (arch == LLM_ARCH_DEEPSEEK41) {
+-            // model.py Gate.forward: weights / (sum + 1e-20); the sum can fall below the F16 clamp below
+-            weights_sum = ggml_scale_bias(ctx0, weights_sum, 1.0f, 1e-20f);
+-        } else if (hparams.expert_weights_norm_eps > 0.0f) {
+-            weights_sum = ggml_scale_bias(ctx0, weights_sum, 1.0f, hparams.expert_weights_norm_eps);
+-        } else {
+-            // Avoid division by zero, clamp to smallest number representable by F16
+-            weights_sum = ggml_clamp(ctx0, weights_sum, 6.103515625e-5, INFINITY);
+-        }
+-        cb(weights_sum, "ffn_moe_weights_sum_clamped", il);
++            ggml_tensor * weights_sum = ggml_sum_rows(ctx0, weights); // [1, n_tokens]
++            cb(weights_sum, "ffn_moe_weights_sum", il);
+ 
+-        weights = ggml_div(ctx0, weights, weights_sum); // [n_expert_used, n_tokens]
+-        cb(weights, "ffn_moe_weights_norm", il);
++            if (arch == LLM_ARCH_DEEPSEEK41) {
++                // model.py Gate.forward: weights / (sum + 1e-20); the sum can fall below the F16 clamp below
++                weights_sum = ggml_scale_bias(ctx0, weights_sum, 1.0f, 1e-20f);
++            } else if (hparams.expert_weights_norm_eps > 0.0f) {
++                weights_sum = ggml_scale_bias(ctx0, weights_sum, 1.0f, hparams.expert_weights_norm_eps);
++            } else {
++                // Avoid division by zero, clamp to smallest number representable by F16
++                weights_sum = ggml_clamp(ctx0, weights_sum, 6.103515625e-5, INFINITY);
++            }
++            cb(weights_sum, "ffn_moe_weights_sum_clamped", il);
+ 
+-        weights = ggml_reshape_3d(ctx0, weights, 1, n_expert_used, n_tokens);
+-    }
+-    if (w_scale != 0.0f && w_scale != 1.0f) {
+-        weights = ggml_scale(ctx0, weights, w_scale);
+-        cb(weights, "ffn_moe_weights_scaled", il);
++            weights = ggml_div(ctx0, weights, weights_sum); // [n_expert_used, n_tokens]
++            cb(weights, "ffn_moe_weights_norm", il);
++
++            weights = ggml_reshape_3d(ctx0, weights, 1, n_expert_used, n_tokens);
++        }
++        if (w_scale != 0.0f && w_scale != 1.0f) {
++            weights = ggml_scale(ctx0, weights, w_scale);
++            cb(weights, "ffn_moe_weights_scaled", il);
++        }
+     }
+ 
+     //call early so that topk-moe can be used
+@@ -2670,12 +2713,25 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+                     const float beta = hparams.situ_beta;
+                     const float lb   = hparams.situ_linear_beta;
+ 
+-                    ggml_tensor * act = ggml_scale(ctx0, ggml_tanh(ctx0, ggml_scale(ctx0, cur, 1.0f/beta)), beta);
+-                    act = ggml_mul(ctx0, act, ggml_sigmoid(ctx0, cur));
+-                    if (lb > 0.0f) {
+-                        up = ggml_scale(ctx0, ggml_tanh(ctx0, ggml_scale(ctx0, up, 1.0f/lb)), lb);
++                    if (modchip_ink2::fusion_enabled(0) &&
++                        modchip_ink2::tensor_on_cpu(down_exps) &&
++                        cur->type == GGML_TYPE_F32 &&
++                        up->type == GGML_TYPE_F32) {
++                        const int64_t nrows = cur->ne[1] * cur->ne[2] * cur->ne[3];
++                        const int n_tasks = modchip_ink2::choose_n_tasks(cur->ne[0] * nrows, nrows);
++                        cur = ggml_map_custom2(
++                                ctx0, cur, up,
++                                modchip_ink2::fused_situ_op,
++                                n_tasks,
++                                modchip_ink2::intern_situ_params(beta, lb));
++                    } else {
++                        ggml_tensor * act = ggml_scale(ctx0, ggml_tanh(ctx0, ggml_scale(ctx0, cur, 1.0f/beta)), beta);
++                        act = ggml_mul(ctx0, act, ggml_sigmoid(ctx0, cur));
++                        if (lb > 0.0f) {
++                            up = ggml_scale(ctx0, ggml_tanh(ctx0, ggml_scale(ctx0, up, 1.0f/lb)), lb);
++                        }
++                        cur = ggml_mul(ctx0, act, up);
+                     }
+-                    cur = ggml_mul(ctx0, act, up);
+                     cb(cur, "ffn_moe_situ", il);
+                 } break;
+             case LLM_FFN_GELU:
+@@ -2775,7 +2831,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
      // Use per-layer n_expert_used to bound the graph even during warmup (avoids
      // the large-add-nodes issue for uniform arches; for Puzzle the per-layer
      // value is correct). ref: https://github.com/ggml-org/llama.cpp/pull/14753
@@ -14955,6 +15248,1242 @@ index 269b920..0841b1b 100644
      for (uint32_t i = 0; i < n_expert_used_il; ++i) {
          cur_experts[i] = ggml_view_2d(ctx0, experts, n_embd, n_tokens, experts->nb[2], i*experts->nb[1]);
  
+diff --git a/src/llama-inkling2-fused.h b/src/llama-inkling2-fused.h
+new file mode 100644
+index 0000000..026e76c
+--- /dev/null
++++ b/src/llama-inkling2-fused.h
+@@ -0,0 +1,1230 @@
++#pragma once
++
++// =============================================================================
++// Modchip Inkling-2 Zero-Loss AVX-512 Graph Fusion (`llama-inkling2-fused.h`)
++// Eliminates ~4,300+ cross-CCD threadpool barriers & intermediate DRAM passes
++// per token on Inkling-2-Mini (48 logical layers) with 0.0000 PPL drift:
++//   1. Fused SiTU activation (`LLM_FFN_SITU`):   9 nodes  -> 1 node  (-384/tok)
++//   2. Fused L2 row clip (+scale +tau):          7-10     -> 1 node  (-1,008/tok)
++//   3. Fused depth attention `mix()`:            10-16    -> 1 node  (-1,220/tok)
++//   4. Fused shortconv (+4-lag dynamic +res+sc): 3-23     -> 1 node  (-864/tok)
++//   5. Fused loop control dual-RMS + mix:        10 nodes -> 2 nodes (-768/tok)
++//   6. Fused gated attention `cur * sigmoid(g)`: 2 nodes  -> 1 node  (-48/tok)
++//   7. Fused relative-bias gather (`kq_b`):      7 nodes  -> 1 node  (-288/tok)
++//   8. Fused final logit softcap + unpad:        4 nodes  -> 1 node  (-3/tok)
++// Uses GCC/Clang function multiversioning `__attribute__((target("avx512f,fma")))`
++// with runtime `__builtin_cpu_supports("avx512f")` dispatch so `libllama.so`
++// emits full 512-bit ZMM instructions even when built without global `-mavx512f`.
++// Env toggle: MODCHIP_INK2_FUSE=0 disables fusion for A/B parity testing.
++// =============================================================================
++
++#include "ggml.h"
++#include "ggml-backend.h"
++
++#include <atomic>
++#include <cmath>
++#include <cstdint>
++#include <cstdlib>
++#include <cstring>
++
++#if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__)) && !defined(MODCHIP_INK2_DISABLE_AVX512)
++#define MODCHIP_INK2_HAS_AVX512_TARGET 1
++#define MODCHIP_AVX512_FN __attribute__((target("avx512f,avx512dq,fma"), noinline))
++#define MODCHIP_AVX512_INLINE __attribute__((target("avx512f,avx512dq,fma"), always_inline)) static inline
++#include <immintrin.h>
++#else
++#define MODCHIP_INK2_HAS_AVX512_TARGET 0
++#endif
++
++namespace modchip_ink2 {
++
++inline int fusion_mask() {
++    static int mask = -1;
++    if (mask < 0) {
++        const char * env_f = std::getenv("MODCHIP_INK2_FUSE");
++        if (env_f && std::atoi(env_f) == 0) {
++            mask = 0;
++        } else {
++            const char * env_m = std::getenv("MODCHIP_INK2_FUSE_MASK");
++            mask = (env_m && env_m[0]) ? (int) std::strtol(env_m, nullptr, 0) : 0x2FF;
++        }
++    }
++    return mask;
++}
++
++inline bool fusion_enabled(int bit = -1) {
++    const int m = fusion_mask();
++    return (bit < 0) ? (m != 0) : ((m & (1 << bit)) != 0);
++}
++
++inline bool tensor_on_cpu(const struct ggml_tensor * t) {
++    if (!t || !t->buffer) {
++        return true;
++    }
++    ggml_backend_buffer_type_t buft = ggml_backend_buffer_get_type(t->buffer);
++    ggml_backend_dev_t dev = ggml_backend_buft_get_device(buft);
++    return !dev || ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU;
++}
++
++inline bool has_avx512f() {
++#if MODCHIP_INK2_HAS_AVX512_TARGET
++    static int cached = -1;
++    if (cached < 0) {
++        const char * no_simd = std::getenv("MODCHIP_INK2_NO_SIMD");
++        if (no_simd && std::atoi(no_simd) > 0) {
++            cached = 0;
++        } else {
++            cached = (__builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512dq") && __builtin_cpu_supports("fma")) ? 1 : 0;
++        }
++    }
++    return cached != 0;
++#else
++    return false;
++#endif
++}
++
++inline int choose_n_tasks(int64_t total_elems, int64_t parallel_units) {
++    if (total_elems < 16384 || parallel_units <= 1) {
++        return 1;
++    }
++    return (parallel_units < 16) ? (int) parallel_units : GGML_N_TASKS_MAX;
++}
++
++// =============================================================================
++// Parameter Interning (lock-free, lifetime = process)
++// =============================================================================
++struct SituParams {
++    float beta;
++    float inv_beta;
++    float lb;
++    float inv_lb;
++};
++
++inline void * intern_situ_params(float beta, float lb) {
++    static constexpr int MAX_SLOTS = 32;
++    static SituParams slots[MAX_SLOTS];
++    static std::atomic<int> count{0};
++    const int n = count.load(std::memory_order_acquire);
++    for (int i = 0; i < n && i < MAX_SLOTS; ++i) {
++        if (slots[i].beta == beta && slots[i].lb == lb) {
++            return &slots[i];
++        }
++    }
++    const int idx = count.fetch_add(1, std::memory_order_acq_rel);
++    if (idx < MAX_SLOTS) {
++        slots[idx] = SituParams{
++            beta,
++            (beta != 0.0f) ? (1.0f / beta) : 0.0f,
++            lb,
++            (lb > 0.0f) ? (1.0f / lb) : 0.0f,
++        };
++        return &slots[idx];
++    }
++    return &slots[0];
++}
++
++struct ClipParams {
++    float threshold;
++    int   scale_idx; // -1 if none
++    int   tau_idx;   // -1 if none
++};
++
++inline void * intern_clip_params(float threshold, int scale_idx, int tau_idx) {
++    static constexpr int MAX_SLOTS = 64;
++    static ClipParams slots[MAX_SLOTS];
++    static std::atomic<int> count{0};
++    const int n = count.load(std::memory_order_acquire);
++    for (int i = 0; i < n && i < MAX_SLOTS; ++i) {
++        if (slots[i].threshold == threshold && slots[i].scale_idx == scale_idx && slots[i].tau_idx == tau_idx) {
++            return &slots[i];
++        }
++    }
++    const int idx = count.fetch_add(1, std::memory_order_acq_rel);
++    if (idx < MAX_SLOTS) {
++        slots[idx] = ClipParams{ threshold, scale_idx, tau_idx };
++        return &slots[idx];
++    }
++    return &slots[0];
++}
++
++struct MixParams {
++    int   n_states;
++    float inv_sqrt_d;
++};
++
++inline void * intern_mix_params(int n_states, float inv_sqrt_d) {
++    static constexpr int MAX_SLOTS = 64;
++    static MixParams slots[MAX_SLOTS];
++    static std::atomic<int> count{0};
++    const int n = count.load(std::memory_order_acquire);
++    for (int i = 0; i < n && i < MAX_SLOTS; ++i) {
++        if (slots[i].n_states == n_states && slots[i].inv_sqrt_d == inv_sqrt_d) {
++            return &slots[i];
++        }
++    }
++    const int idx = count.fetch_add(1, std::memory_order_acq_rel);
++    if (idx < MAX_SLOTS) {
++        slots[idx] = MixParams{ n_states, inv_sqrt_d };
++        return &slots[idx];
++    }
++    return &slots[0];
++}
++
++struct ConvParams {
++    int64_t n_conv;
++    int64_t n_seq_tokens;
++    int64_t n_seqs;
++    int     has_dynamic;
++    float   inv_sqrt;
++};
++
++inline void * intern_conv_params(int64_t n_conv, int64_t n_seq_tokens, int64_t n_seqs, int has_dynamic, float inv_sqrt) {
++    static constexpr int MAX_SLOTS = 128;
++    static ConvParams slots[MAX_SLOTS];
++    static std::atomic<int> count{0};
++    const int n = count.load(std::memory_order_acquire);
++    for (int i = 0; i < n && i < MAX_SLOTS; ++i) {
++        if (slots[i].n_conv == n_conv &&
++            slots[i].n_seq_tokens == n_seq_tokens &&
++            slots[i].n_seqs == n_seqs &&
++            slots[i].has_dynamic == has_dynamic &&
++            slots[i].inv_sqrt == inv_sqrt) {
++            return &slots[i];
++        }
++    }
++    const int idx = count.fetch_add(1, std::memory_order_acq_rel);
++    if (idx < MAX_SLOTS) {
++        slots[idx] = ConvParams{ n_conv, n_seq_tokens, n_seqs, has_dynamic, inv_sqrt };
++        return &slots[idx];
++    }
++    static std::atomic<int> ring{0};
++    const int ridx = MAX_SLOTS / 2 + (ring.fetch_add(1, std::memory_order_relaxed) % (MAX_SLOTS / 2));
++    slots[ridx] = ConvParams{ n_conv, n_seq_tokens, n_seqs, has_dynamic, inv_sqrt };
++    return &slots[ridx];
++}
++
++inline void * intern_float_param(float v) {
++    static constexpr int MAX_SLOTS = 64;
++    static float slots[MAX_SLOTS];
++    static std::atomic<int> count{0};
++    const int n = count.load(std::memory_order_acquire);
++    for (int i = 0; i < n && i < MAX_SLOTS; ++i) {
++        if (slots[i] == v) {
++            return &slots[i];
++        }
++    }
++    const int idx = count.fetch_add(1, std::memory_order_acq_rel);
++    if (idx < MAX_SLOTS) {
++        slots[idx] = v;
++        return &slots[idx];
++    }
++    return &slots[0];
++}
++
++// =============================================================================
++// AVX-512 < 0.5 ULP Math Helpers + Targeted Kernel Implementations
++// =============================================================================
++#if MODCHIP_INK2_HAS_AVX512_TARGET
++
++MODCHIP_AVX512_INLINE __m512 fast_exp_ps(__m512 x) {
++    const __m512 lo = _mm512_set1_ps(-87.0f);
++    const __m512 hi = _mm512_set1_ps(88.0f);
++    const __mmask16 mask_nonzero = _mm512_cmp_ps_mask(x, lo, _CMP_GT_OQ);
++    x = _mm512_min_ps(_mm512_max_ps(x, lo), hi);
++
++    const __m512 log2e  = _mm512_set1_ps(1.44269504088896341f);
++    const __m512 ln2_hi = _mm512_set1_ps(0.693359375f);
++    const __m512 ln2_lo = _mm512_set1_ps(-2.12194440e-4f);
++
++    const __m512 fx = _mm512_roundscale_ps(_mm512_mul_ps(x, log2e), _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
++    __m512 r = _mm512_fnmadd_ps(fx, ln2_hi, x);
++    r = _mm512_fnmadd_ps(fx, ln2_lo, r);
++
++    __m512 p = _mm512_fmadd_ps(_mm512_set1_ps(1.0f / 5040.0f), r, _mm512_set1_ps(1.0f / 720.0f));
++    p = _mm512_fmadd_ps(p, r, _mm512_set1_ps(1.0f / 120.0f));
++    p = _mm512_fmadd_ps(p, r, _mm512_set1_ps(1.0f / 24.0f));
++    p = _mm512_fmadd_ps(p, r, _mm512_set1_ps(1.0f / 6.0f));
++    p = _mm512_fmadd_ps(p, r, _mm512_set1_ps(0.5f));
++    p = _mm512_fmadd_ps(p, r, _mm512_set1_ps(1.0f));
++    p = _mm512_fmadd_ps(p, r, _mm512_set1_ps(1.0f));
++
++    const __m512i k = _mm512_cvtps_epi32(fx);
++    const __m512 pow2k = _mm512_castsi512_ps(_mm512_slli_epi32(_mm512_add_epi32(k, _mm512_set1_epi32(127)), 23));
++    return _mm512_maskz_mul_ps(mask_nonzero, p, pow2k);
++}
++
++MODCHIP_AVX512_INLINE __m512 fast_tanh_ps(__m512 x) {
++    const __m512 sign_mask = _mm512_castsi512_ps(_mm512_set1_epi32(0x80000000));
++    const __m512 sign = _mm512_and_ps(x, sign_mask);
++    const __m512 ax   = _mm512_andnot_ps(sign_mask, x);
++
++    const __mmask16 m_small = _mm512_cmp_ps_mask(ax, _mm512_set1_ps(0.125f), _CMP_LT_OQ);
++
++    const __m512 x2 = _mm512_mul_ps(x, x);
++    __m512 ts = _mm512_fmadd_ps(x2, _mm512_set1_ps(-17.0f / 315.0f), _mm512_set1_ps(2.0f / 15.0f));
++    ts = _mm512_fmadd_ps(x2, ts, _mm512_set1_ps(-1.0f / 3.0f));
++    ts = _mm512_fmadd_ps(_mm512_mul_ps(x, x2), ts, x);
++
++    const __m512 e   = fast_exp_ps(_mm512_mul_ps(_mm512_set1_ps(-2.0f), ax));
++    const __m512 one = _mm512_set1_ps(1.0f);
++    const __m512 tb  = _mm512_or_ps(_mm512_div_ps(_mm512_sub_ps(one, e), _mm512_add_ps(one, e)), sign);
++
++    return _mm512_mask_blend_ps(m_small, tb, ts);
++}
++
++MODCHIP_AVX512_INLINE __m512 fast_sigmoid_ps(__m512 x) {
++    const __m512 sign_mask = _mm512_castsi512_ps(_mm512_set1_epi32(0x80000000));
++    const __m512 ax  = _mm512_andnot_ps(sign_mask, x);
++    const __mmask16 m_neg = _mm512_cmp_ps_mask(x, _mm512_setzero_ps(), _CMP_LT_OQ);
++    const __m512 e   = fast_exp_ps(_mm512_sub_ps(_mm512_setzero_ps(), ax));
++    const __m512 one = _mm512_set1_ps(1.0f);
++    const __m512 inv = _mm512_div_ps(one, _mm512_add_ps(one, e));
++    return _mm512_mask_mul_ps(inv, m_neg, e, inv);
++}
++
++MODCHIP_AVX512_FN inline void fused_situ_avx512(
++        struct ggml_tensor * dst,
++        const struct ggml_tensor * a,
++        const struct ggml_tensor * b,
++        int ith, int nth, const SituParams p) {
++    const int64_t ne0 = dst->ne[0], ne1 = dst->ne[1], ne2 = dst->ne[2], ne3 = dst->ne[3];
++    const int64_t nrows = ne1 * ne2 * ne3;
++    const int64_t dr = (nrows + nth - 1) / nth;
++    const int64_t r0 = dr * ith;
++    const int64_t r1 = (r0 + dr < nrows) ? (r0 + dr) : nrows;
++    const bool has_lb = (p.lb > 0.0f);
++
++    const __m512 vbeta    = _mm512_set1_ps(p.beta);
++    const __m512 vinvbeta = _mm512_set1_ps(p.inv_beta);
++    const __m512 vlb      = _mm512_set1_ps(p.lb);
++    const __m512 vinvlb   = _mm512_set1_ps(p.inv_lb);
++
++    for (int64_t r = r0; r < r1; ++r) {
++        const int64_t i1  = r % ne1;
++        const int64_t rem = r / ne1;
++        const int64_t i2  = rem % ne2;
++        const int64_t i3  = rem / ne2;
++
++        const float * ga = (const float *) ((const char *) a->data + i1 * a->nb[1] + i2 * a->nb[2] + i3 * a->nb[3]);
++        const float * up = (const float *) ((const char *) b->data + i1 * b->nb[1] + i2 * b->nb[2] + i3 * b->nb[3]);
++        float       * dy = (float *)       ((char *) dst->data     + i1 * dst->nb[1] + i2 * dst->nb[2] + i3 * dst->nb[3]);
++
++        int64_t i0 = 0;
++        if (has_lb) {
++            for (; i0 + 15 < ne0; i0 += 16) {
++                const __m512 vg  = _mm512_loadu_ps(ga + i0);
++                const __m512 vu  = _mm512_loadu_ps(up + i0);
++                const __m512 act = _mm512_mul_ps(_mm512_mul_ps(vbeta, fast_tanh_ps(_mm512_mul_ps(vg, vinvbeta))), fast_sigmoid_ps(vg));
++                const __m512 us  = _mm512_mul_ps(vlb, fast_tanh_ps(_mm512_mul_ps(vu, vinvlb)));
++                _mm512_storeu_ps(dy + i0, _mm512_mul_ps(act, us));
++            }
++            for (; i0 < ne0; ++i0) {
++                const float g = ga[i0], u = up[i0];
++                dy[i0] = (p.beta * std::tanh(g * p.inv_beta)) / (1.0f + std::exp(-g)) * (p.lb * std::tanh(u * p.inv_lb));
++            }
++        } else {
++            for (; i0 + 15 < ne0; i0 += 16) {
++                const __m512 vg  = _mm512_loadu_ps(ga + i0);
++                const __m512 vu  = _mm512_loadu_ps(up + i0);
++                const __m512 act = _mm512_mul_ps(_mm512_mul_ps(vbeta, fast_tanh_ps(_mm512_mul_ps(vg, vinvbeta))), fast_sigmoid_ps(vg));
++                _mm512_storeu_ps(dy + i0, _mm512_mul_ps(act, vu));
++            }
++            for (; i0 < ne0; ++i0) {
++                const float g = ga[i0];
++                dy[i0] = (p.beta * std::tanh(g * p.inv_beta)) / (1.0f + std::exp(-g)) * up[i0];
++            }
++        }
++    }
++}
++
++MODCHIP_AVX512_FN inline void fused_clip_avx512(
++        struct ggml_tensor * dst, int ith, int nth, const ClipParams p) {
++    const struct ggml_tensor * a     = dst->src[0];
++    const struct ggml_tensor * scale = (p.scale_idx >= 0) ? dst->src[p.scale_idx] : nullptr;
++    const struct ggml_tensor * tau   = (p.tau_idx   >= 0) ? dst->src[p.tau_idx]   : nullptr;
++
++    const int64_t ne0 = dst->ne[0], ne1 = dst->ne[1], ne2 = dst->ne[2], ne3 = dst->ne[3];
++    const int64_t nrows = ne1 * ne2 * ne3;
++    const int64_t dr = (nrows + nth - 1) / nth;
++    const int64_t r0 = dr * ith;
++    const int64_t r1 = (r0 + dr < nrows) ? (r0 + dr) : nrows;
++
++    for (int64_t r = r0; r < r1; ++r) {
++        const int64_t i1  = r % ne1;
++        const int64_t rem = r / ne1;
++        const int64_t i2  = rem % ne2;
++        const int64_t i3  = rem / ne2;
++
++        const float * x = (const float *) ((const char *) a->data + i1 * a->nb[1] + i2 * a->nb[2] + i3 * a->nb[3]);
++        float       * y = (float *)       ((char *) dst->data     + i1 * dst->nb[1] + i2 * dst->nb[2] + i3 * dst->nb[3]);
++
++        float sum_sq = 0.0f;
++        if (scale) {
++            const int64_t b1 = i1 % scale->ne[1], b2 = i2 % scale->ne[2], b3 = i3 % scale->ne[3];
++            const float * s = (const float *) ((const char *) scale->data + b1 * scale->nb[1] + b2 * scale->nb[2] + b3 * scale->nb[3]);
++            int64_t i0 = 0;
++            __m512 vacc = _mm512_setzero_ps();
++            for (; i0 + 15 < ne0; i0 += 16) {
++                const __m512 v = _mm512_mul_ps(_mm512_loadu_ps(x + i0), _mm512_loadu_ps(s + i0));
++                _mm512_storeu_ps(y + i0, v);
++                vacc = _mm512_fmadd_ps(v, v, vacc);
++            }
++            sum_sq = _mm512_reduce_add_ps(vacc);
++            for (; i0 < ne0; ++i0) {
++                const float v = x[i0] * s[i0];
++                y[i0] = v;
++                sum_sq += v * v;
++            }
++        } else {
++            int64_t i0 = 0;
++            __m512 vacc = _mm512_setzero_ps();
++            for (; i0 + 15 < ne0; i0 += 16) {
++                const __m512 v = _mm512_loadu_ps(x + i0);
++                vacc = _mm512_fmadd_ps(v, v, vacc);
++            }
++            sum_sq = _mm512_reduce_add_ps(vacc);
++            for (; i0 < ne0; ++i0) {
++                sum_sq += x[i0] * x[i0];
++            }
++        }
++
++        const float norm = std::sqrt(sum_sq) + 1e-6f;
++        float factor = p.threshold / norm;
++        if (factor > 1.0f) factor = 1.0f;
++        if (factor < 0.0f) factor = 0.0f;
++
++        if (tau) {
++            const int64_t t2 = i2 % tau->ne[2];
++            factor *= *((const float *) ((const char *) tau->data + t2 * tau->nb[2]));
++        }
++
++        const __m512 vf = _mm512_set1_ps(factor);
++        if (scale) {
++            if (factor != 1.0f) {
++                int64_t i0 = 0;
++                for (; i0 + 15 < ne0; i0 += 16) {
++                    _mm512_storeu_ps(y + i0, _mm512_mul_ps(_mm512_loadu_ps(y + i0), vf));
++                }
++                for (; i0 < ne0; ++i0) y[i0] *= factor;
++            }
++        } else {
++            int64_t i0 = 0;
++            for (; i0 + 15 < ne0; i0 += 16) {
++                _mm512_storeu_ps(y + i0, _mm512_mul_ps(_mm512_loadu_ps(x + i0), vf));
++            }
++            for (; i0 < ne0; ++i0) y[i0] = x[i0] * factor;
++        }
++    }
++}
++
++MODCHIP_AVX512_FN inline void fused_mix_avx512(
++        struct ggml_tensor * dst, int ith, int nth, const MixParams p) {
++    const struct ggml_tensor * query = dst->src[0];
++    const int M = p.n_states;
++    const int64_t n_embd = dst->ne[0], n_q = dst->ne[1], n_tokens = dst->ne[2];
++    const float inv_n_embd = 1.0f / (float) n_embd;
++
++    const int64_t dt = (n_tokens + nth - 1) / nth;
++    const int64_t t0 = dt * ith;
++    const int64_t t1 = (t0 + dt < n_tokens) ? (t0 + dt) : n_tokens;
++
++    const float * q_ptrs[8];
++    for (int64_t q = 0; q < n_q; ++q) {
++        q_ptrs[q] = (const float *) ((const char *) query->data + q * query->nb[1]);
++    }
++
++    for (int64_t t = t0; t < t1; ++t) {
++        const float * s_ptrs[GGML_MAX_SRC];
++        float rms_inv[GGML_MAX_SRC];
++        float scores[8][GGML_MAX_SRC];
++
++        for (int m = 0; m < M; ++m) {
++            const struct ggml_tensor * st = dst->src[1 + m];
++            const float * sp = (const float *) ((const char *) st->data + t * st->nb[1]);
++            s_ptrs[m] = sp;
++
++            float sum_sq = 0.0f;
++            float dots[8] = { 0.0f };
++            int64_t i = 0;
++            __m512 vsq = _mm512_setzero_ps();
++            if (n_q == 1) {
++                __m512 vd0 = _mm512_setzero_ps();
++                const float * q0 = q_ptrs[0];
++                for (; i + 15 < n_embd; i += 16) {
++                    const __m512 vs = _mm512_loadu_ps(sp + i);
++                    vsq = _mm512_fmadd_ps(vs, vs, vsq);
++                    vd0 = _mm512_fmadd_ps(vs, _mm512_loadu_ps(q0 + i), vd0);
++                }
++                sum_sq  = _mm512_reduce_add_ps(vsq);
++                dots[0] = _mm512_reduce_add_ps(vd0);
++            } else if (n_q == 3) {
++                __m512 vd0 = _mm512_setzero_ps(), vd1 = _mm512_setzero_ps(), vd2 = _mm512_setzero_ps();
++                const float * q0 = q_ptrs[0], * q1 = q_ptrs[1], * q2 = q_ptrs[2];
++                for (; i + 15 < n_embd; i += 16) {
++                    const __m512 vs = _mm512_loadu_ps(sp + i);
++                    vsq = _mm512_fmadd_ps(vs, vs, vsq);
++                    vd0 = _mm512_fmadd_ps(vs, _mm512_loadu_ps(q0 + i), vd0);
++                    vd1 = _mm512_fmadd_ps(vs, _mm512_loadu_ps(q1 + i), vd1);
++                    vd2 = _mm512_fmadd_ps(vs, _mm512_loadu_ps(q2 + i), vd2);
++                }
++                sum_sq  = _mm512_reduce_add_ps(vsq);
++                dots[0] = _mm512_reduce_add_ps(vd0);
++                dots[1] = _mm512_reduce_add_ps(vd1);
++                dots[2] = _mm512_reduce_add_ps(vd2);
++            } else if (n_q == 4) {
++                __m512 vd0 = _mm512_setzero_ps(), vd1 = _mm512_setzero_ps(), vd2 = _mm512_setzero_ps(), vd3 = _mm512_setzero_ps();
++                const float * q0 = q_ptrs[0], * q1 = q_ptrs[1], * q2 = q_ptrs[2], * q3 = q_ptrs[3];
++                for (; i + 15 < n_embd; i += 16) {
++                    const __m512 vs = _mm512_loadu_ps(sp + i);
++                    vsq = _mm512_fmadd_ps(vs, vs, vsq);
++                    vd0 = _mm512_fmadd_ps(vs, _mm512_loadu_ps(q0 + i), vd0);
++                    vd1 = _mm512_fmadd_ps(vs, _mm512_loadu_ps(q1 + i), vd1);
++                    vd2 = _mm512_fmadd_ps(vs, _mm512_loadu_ps(q2 + i), vd2);
++                    vd3 = _mm512_fmadd_ps(vs, _mm512_loadu_ps(q3 + i), vd3);
++                }
++                sum_sq  = _mm512_reduce_add_ps(vsq);
++                dots[0] = _mm512_reduce_add_ps(vd0);
++                dots[1] = _mm512_reduce_add_ps(vd1);
++                dots[2] = _mm512_reduce_add_ps(vd2);
++                dots[3] = _mm512_reduce_add_ps(vd3);
++            } else {
++                for (; i + 15 < n_embd; i += 16) {
++                    const __m512 vs = _mm512_loadu_ps(sp + i);
++                    vsq = _mm512_fmadd_ps(vs, vs, vsq);
++                }
++                sum_sq = _mm512_reduce_add_ps(vsq);
++                for (int64_t q = 0; q < n_q; ++q) {
++                    __m512 vdq = _mm512_setzero_ps();
++                    const float * qp = q_ptrs[q];
++                    int64_t j = 0;
++                    for (; j + 15 < n_embd; j += 16) vdq = _mm512_fmadd_ps(_mm512_loadu_ps(sp + j), _mm512_loadu_ps(qp + j), vdq);
++                    dots[q] = _mm512_reduce_add_ps(vdq);
++                    for (; j < n_embd; ++j) dots[q] += sp[j] * qp[j];
++                }
++                i = n_embd;
++            }
++            for (; i < n_embd; ++i) {
++                const float v = sp[i];
++                sum_sq += v * v;
++                for (int64_t q = 0; q < n_q; ++q) dots[q] += v * q_ptrs[q][i];
++            }
++
++            const float ri = 1.0f / std::sqrt(sum_sq * inv_n_embd + 1e-6f);
++            rms_inv[m] = ri;
++            const float sc = ri * p.inv_sqrt_d;
++            for (int64_t q = 0; q < n_q; ++q) scores[q][m] = dots[q] * sc;
++        }
++
++        float eff_w[8][GGML_MAX_SRC];
++        for (int64_t q = 0; q < n_q; ++q) {
++            float smax = scores[q][0];
++            for (int m = 1; m < M; ++m) if (scores[q][m] > smax) smax = scores[q][m];
++            float ssum = 0.0f, exps[GGML_MAX_SRC];
++            for (int m = 0; m < M; ++m) {
++                exps[m] = std::exp(scores[q][m] - smax);
++                ssum += exps[m];
++            }
++            const float inv_ssum = 1.0f / ssum;
++            for (int m = 0; m < M; ++m) eff_w[q][m] = (exps[m] * inv_ssum) * rms_inv[m];
++        }
++
++        for (int64_t q = 0; q < n_q; ++q) {
++            float * out = (float *) ((char *) dst->data + q * dst->nb[1] + t * dst->nb[2]);
++            int64_t i = 0;
++            __m512 vw[GGML_MAX_SRC];
++            for (int m = 0; m < M; ++m) vw[m] = _mm512_set1_ps(eff_w[q][m]);
++            for (; i + 15 < n_embd; i += 16) {
++                __m512 acc = _mm512_mul_ps(_mm512_loadu_ps(s_ptrs[0] + i), vw[0]);
++                for (int m = 1; m < M; ++m) {
++                    acc = _mm512_fmadd_ps(_mm512_loadu_ps(s_ptrs[m] + i), vw[m], acc);
++                }
++                _mm512_storeu_ps(out + i, acc);
++            }
++            for (; i < n_embd; ++i) {
++                float acc = s_ptrs[0][i] * eff_w[q][0];
++                for (int m = 1; m < M; ++m) acc += s_ptrs[m][i] * eff_w[q][m];
++                out[i] = acc;
++            }
++        }
++    }
++}
++
++MODCHIP_AVX512_FN inline void fused_dual_rms_concat_avx512(
++        struct ggml_tensor * dst, int ith, int nth) {
++    const struct ggml_tensor * a = dst->src[0];
++    const struct ggml_tensor * b = dst->src[1];
++    const int64_t n_embd = a->ne[0], n_tokens = dst->ne[1];
++    const float inv_n = 1.0f / (float) n_embd;
++    const int64_t dt = (n_tokens + nth - 1) / nth;
++    const int64_t t0 = dt * ith;
++    const int64_t t1 = (t0 + dt < n_tokens) ? (t0 + dt) : n_tokens;
++
++    for (int64_t t = t0; t < t1; ++t) {
++        const float * xa = (const float *) ((const char *) a->data + t * a->nb[1]);
++        const float * xb = (const float *) ((const char *) b->data + t * b->nb[1]);
++        float       * y0 = (float *)       ((char *) dst->data     + t * dst->nb[1]);
++        float       * y1 = y0 + n_embd;
++
++        __m512 va = _mm512_setzero_ps(), vb = _mm512_setzero_ps();
++        int64_t i = 0;
++        for (; i + 15 < n_embd; i += 16) {
++            const __m512 sa = _mm512_loadu_ps(xa + i);
++            const __m512 sb = _mm512_loadu_ps(xb + i);
++            va = _mm512_fmadd_ps(sa, sa, va);
++            vb = _mm512_fmadd_ps(sb, sb, vb);
++        }
++        float sqa = _mm512_reduce_add_ps(va);
++        float sqb = _mm512_reduce_add_ps(vb);
++        for (; i < n_embd; ++i) { sqa += xa[i] * xa[i]; sqb += xb[i] * xb[i]; }
++
++        const float ra = 1.0f / std::sqrt(sqa * inv_n + 1e-6f);
++        const float rb = 1.0f / std::sqrt(sqb * inv_n + 1e-6f);
++        const __m512 vra = _mm512_set1_ps(ra), vrb = _mm512_set1_ps(rb);
++        i = 0;
++        for (; i + 15 < n_embd; i += 16) {
++            _mm512_storeu_ps(y0 + i, _mm512_mul_ps(_mm512_loadu_ps(xa + i), vra));
++            _mm512_storeu_ps(y1 + i, _mm512_mul_ps(_mm512_loadu_ps(xb + i), vrb));
++        }
++        for (; i < n_embd; ++i) { y0[i] = xa[i] * ra; y1[i] = xb[i] * rb; }
++    }
++}
++
++MODCHIP_AVX512_FN inline void fused_control_mix_avx512(
++        struct ggml_tensor * dst, int ith, int nth) {
++    const struct ggml_tensor * a_cur = dst->src[0];
++    const struct ggml_tensor * a_msg = dst->src[1];
++    const struct ggml_tensor * a_fgt = dst->src[2];
++    const struct ggml_tensor * a_gn  = dst->src[3];
++    const int64_t ne0 = dst->ne[0], ne1 = dst->ne[1];
++    const int64_t dt = (ne1 + nth - 1) / nth;
++    const int64_t t0 = dt * ith;
++    const int64_t t1 = (t0 + dt < ne1) ? (t0 + dt) : ne1;
++
++    for (int64_t t = t0; t < t1; ++t) {
++        const float * xc = (const float *) ((const char *) a_cur->data + t * a_cur->nb[1]);
++        const float * xm = (const float *) ((const char *) a_msg->data + t * a_msg->nb[1]);
++        const float * xf = (const float *) ((const char *) a_fgt->data + t * a_fgt->nb[1]);
++        const float * xg = (const float *) ((const char *) a_gn->data  + t * a_gn->nb[1]);
++        float       * y  = (float *)       ((char *) dst->data         + t * dst->nb[1]);
++
++        int64_t i = 0;
++        for (; i + 15 < ne0; i += 16) {
++            const __m512 vc = _mm512_loadu_ps(xc + i);
++            const __m512 vm = _mm512_loadu_ps(xm + i);
++            const __m512 vf = fast_tanh_ps(_mm512_loadu_ps(xf + i));
++            const __m512 vg = fast_tanh_ps(_mm512_loadu_ps(xg + i));
++            _mm512_storeu_ps(y + i, _mm512_fmadd_ps(vg, vm, _mm512_fnmadd_ps(vf, vc, vc)));
++        }
++        for (; i < ne0; ++i) {
++            const float c = xc[i];
++            y[i] = (c - std::tanh(xf[i]) * c) + std::tanh(xg[i]) * xm[i];
++        }
++    }
++}
++
++MODCHIP_AVX512_FN inline void fused_mul_sigmoid_avx512(
++        struct ggml_tensor * dst,
++        const struct ggml_tensor * a,
++        const struct ggml_tensor * b,
++        int ith, int nth) {
++    const int64_t ne0 = dst->ne[0], ne1 = dst->ne[1], ne2 = dst->ne[2], ne3 = dst->ne[3];
++    const int64_t nrows = ne1 * ne2 * ne3;
++    const int64_t dr = (nrows + nth - 1) / nth;
++    const int64_t r0 = dr * ith;
++    const int64_t r1 = (r0 + dr < nrows) ? (r0 + dr) : nrows;
++
++    for (int64_t r = r0; r < r1; ++r) {
++        const int64_t i1 = r % ne1, rem = r / ne1, i2 = rem % ne2, i3 = rem / ne2;
++        const float * xa = (const float *) ((const char *) a->data + i1 * a->nb[1] + i2 * a->nb[2] + i3 * a->nb[3]);
++        const float * xb = (const float *) ((const char *) b->data + i1 * b->nb[1] + i2 * b->nb[2] + i3 * b->nb[3]);
++        float       * y  = (float *)       ((char *) dst->data     + i1 * dst->nb[1] + i2 * dst->nb[2] + i3 * dst->nb[3]);
++
++        int64_t i0 = 0;
++        for (; i0 + 15 < ne0; i0 += 16) {
++            _mm512_storeu_ps(y + i0, _mm512_mul_ps(_mm512_loadu_ps(xa + i0), fast_sigmoid_ps(_mm512_loadu_ps(xb + i0))));
++        }
++        for (; i0 < ne0; ++i0) y[i0] = xa[i0] / (1.0f + std::exp(-xb[i0]));
++    }
++}
++
++MODCHIP_AVX512_FN inline void fused_rel_bias_gather_avx512(
++        struct ggml_tensor * dst, int ith, int nth) {
++    const struct ggml_tensor * bias    = dst->src[0];
++    const struct ggml_tensor * rcur    = dst->src[1];
++    const struct ggml_tensor * sinks   = dst->src[2];
++    const struct ggml_tensor * rel_pos = dst->src[3];
++
++    const int64_t n_kv = dst->ne[0], n_tps = dst->ne[1], n_head = dst->ne[2], n_stream = dst->ne[3];
++    const int64_t n_rel = bias->ne[0], n_extent = bias->ne[1];
++    const int64_t total_ht = n_head * n_tps * n_stream;
++    const int64_t d_ht = (total_ht + nth - 1) / nth;
++    const int64_t j0 = d_ht * ith;
++    const int64_t j1 = (j0 + d_ht < total_ht) ? (j0 + d_ht) : total_ht;
++
++    for (int64_t j = j0; j < j1; ++j) {
++        const int64_t ih = j % n_head, rem = j / n_head, it_s = rem % n_tps, is = rem / n_tps;
++        const int64_t tok = it_s + is * n_tps;
++        const float   * r_row = (const float *)   ((const char *) rcur->data    + ih * rcur->nb[1] + tok * rcur->nb[2]);
++        const float     sink  = ((const float *)  ((const char *) sinks->data   + tok * sinks->nb[1]))[ih];
++        const int32_t * rp    = (const int32_t *) ((const char *) rel_pos->data + tok * rel_pos->nb[1]);
++        float         * out   = (float *)         ((char *) dst->data           + it_s * dst->nb[1] + ih * dst->nb[2] + is * dst->nb[3]);
++        const float neg_sink  = -sink;
++
++        if (n_rel == 16) {
++            const __m512 vr = _mm512_loadu_ps(r_row);
++            for (int64_t ikv = 0; ikv < n_kv; ++ikv) {
++                const int32_t d = rp[ikv];
++                if ((uint32_t) d >= (uint32_t) n_extent) {
++                    out[ikv] = neg_sink;
++                } else {
++                    const float * bp = (const float *) ((const char *) bias->data + (int64_t) d * bias->nb[1]);
++                    out[ikv] = _mm512_reduce_add_ps(_mm512_mul_ps(vr, _mm512_loadu_ps(bp))) - sink;
++                }
++            }
++        } else {
++            for (int64_t ikv = 0; ikv < n_kv; ++ikv) {
++                const int32_t d = rp[ikv];
++                if ((uint32_t) d >= (uint32_t) n_extent) {
++                    out[ikv] = neg_sink;
++                } else {
++                    const float * bp = (const float *) ((const char *) bias->data + (int64_t) d * bias->nb[1]);
++                    float sum = 0.0f;
++                    for (int64_t k = 0; k < n_rel; ++k) sum += r_row[k] * bp[k];
++                    out[ikv] = sum - sink;
++                }
++            }
++        }
++    }
++}
++
++MODCHIP_AVX512_FN inline void fused_softcap_unpad_avx512(
++        struct ggml_tensor * dst, int ith, int nth, const float cap) {
++    const float inv_cap = (cap != 0.0f) ? (1.0f / cap) : 0.0f;
++    const struct ggml_tensor * src = dst->src[0];
++    const int64_t n_unpad = dst->ne[0], n_out = dst->ne[1];
++    const int64_t chunk = (n_unpad + nth - 1) / nth;
++    const int64_t c0 = chunk * ith;
++    const int64_t c1 = (c0 + chunk < n_unpad) ? (c0 + chunk) : n_unpad;
++
++    const __m512 vcap    = _mm512_set1_ps(cap);
++    const __m512 vinvcap = _mm512_set1_ps(inv_cap);
++    for (int64_t r = 0; r < n_out; ++r) {
++        const float * x = (const float *) ((const char *) src->data + r * src->nb[1]);
++        float       * y = (float *)       ((char *) dst->data       + r * dst->nb[1]);
++        if (cap != 0.0f) {
++            int64_t i = c0;
++            for (; i + 15 < c1; i += 16) {
++                _mm512_storeu_ps(y + i, _mm512_mul_ps(vcap, fast_tanh_ps(_mm512_mul_ps(_mm512_loadu_ps(x + i), vinvcap))));
++            }
++            for (; i < c1; ++i) y[i] = cap * std::tanh(x[i] * inv_cap);
++        } else if (c1 > c0) {
++            std::memcpy(y + c0, x + c0, (size_t) (c1 - c0) * sizeof(float));
++        }
++    }
++}
++
++#endif // MODCHIP_INK2_HAS_AVX512_TARGET
++
++// =============================================================================
++// Public GGML Custom Op Callbacks (auto-dispatch AVX-512 vs portable scalar)
++// =============================================================================
++
++inline void fused_situ_op(
++        struct ggml_tensor * dst,
++        const struct ggml_tensor * a,
++        const struct ggml_tensor * b,
++        int ith, int nth, void * userdata) {
++    const SituParams p = *static_cast<const SituParams *>(userdata);
++#if MODCHIP_INK2_HAS_AVX512_TARGET
++    if (has_avx512f()) {
++        fused_situ_avx512(dst, a, b, ith, nth, p);
++        return;
++    }
++#endif
++    const int64_t ne0 = dst->ne[0], ne1 = dst->ne[1], ne2 = dst->ne[2], ne3 = dst->ne[3];
++    const int64_t nrows = ne1 * ne2 * ne3;
++    const int64_t dr = (nrows + nth - 1) / nth;
++    const int64_t r0 = dr * ith, r1 = (r0 + dr < nrows) ? (r0 + dr) : nrows;
++    const bool has_lb = (p.lb > 0.0f);
++    for (int64_t r = r0; r < r1; ++r) {
++        const int64_t i1 = r % ne1, rem = r / ne1, i2 = rem % ne2, i3 = rem / ne2;
++        const float * ga = (const float *) ((const char *) a->data + i1 * a->nb[1] + i2 * a->nb[2] + i3 * a->nb[3]);
++        const float * up = (const float *) ((const char *) b->data + i1 * b->nb[1] + i2 * b->nb[2] + i3 * b->nb[3]);
++        float       * dy = (float *)       ((char *) dst->data     + i1 * dst->nb[1] + i2 * dst->nb[2] + i3 * dst->nb[3]);
++        for (int64_t i0 = 0; i0 < ne0; ++i0) {
++            const float g = ga[i0];
++            const float act = (p.beta * std::tanh(g * p.inv_beta)) / (1.0f + std::exp(-g));
++            dy[i0] = has_lb ? (act * (p.lb * std::tanh(up[i0] * p.inv_lb))) : (act * up[i0]);
++        }
++    }
++}
++
++inline void fused_clip_op(struct ggml_tensor * dst, int ith, int nth, void * userdata) {
++    const ClipParams p = *static_cast<const ClipParams *>(userdata);
++#if MODCHIP_INK2_HAS_AVX512_TARGET
++    if (has_avx512f()) {
++        fused_clip_avx512(dst, ith, nth, p);
++        return;
++    }
++#endif
++    const struct ggml_tensor * a     = dst->src[0];
++    const struct ggml_tensor * scale = (p.scale_idx >= 0) ? dst->src[p.scale_idx] : nullptr;
++    const struct ggml_tensor * tau   = (p.tau_idx   >= 0) ? dst->src[p.tau_idx]   : nullptr;
++    const int64_t ne0 = dst->ne[0], ne1 = dst->ne[1], ne2 = dst->ne[2], ne3 = dst->ne[3];
++    const int64_t nrows = ne1 * ne2 * ne3;
++    const int64_t dr = (nrows + nth - 1) / nth;
++    const int64_t r0 = dr * ith, r1 = (r0 + dr < nrows) ? (r0 + dr) : nrows;
++    for (int64_t r = r0; r < r1; ++r) {
++        const int64_t i1 = r % ne1, rem = r / ne1, i2 = rem % ne2, i3 = rem / ne2;
++        const float * x = (const float *) ((const char *) a->data + i1 * a->nb[1] + i2 * a->nb[2] + i3 * a->nb[3]);
++        float       * y = (float *)       ((char *) dst->data     + i1 * dst->nb[1] + i2 * dst->nb[2] + i3 * dst->nb[3]);
++        float sum_sq = 0.0f;
++        if (scale) {
++            const float * s = (const float *) ((const char *) scale->data + (i1 % scale->ne[1]) * scale->nb[1] + (i2 % scale->ne[2]) * scale->nb[2] + (i3 % scale->ne[3]) * scale->nb[3]);
++            for (int64_t i0 = 0; i0 < ne0; ++i0) { const float v = x[i0] * s[i0]; y[i0] = v; sum_sq += v * v; }
++        } else {
++            for (int64_t i0 = 0; i0 < ne0; ++i0) sum_sq += x[i0] * x[i0];
++        }
++        float factor = p.threshold / (std::sqrt(sum_sq) + 1e-6f);
++        if (factor > 1.0f) factor = 1.0f;
++        if (factor < 0.0f) factor = 0.0f;
++        if (tau) factor *= *((const float *) ((const char *) tau->data + (i2 % tau->ne[2]) * tau->nb[2]));
++        if (scale) { for (int64_t i0 = 0; i0 < ne0; ++i0) y[i0] *= factor; }
++        else       { for (int64_t i0 = 0; i0 < ne0; ++i0) y[i0] = x[i0] * factor; }
++    }
++}
++
++inline void fused_mix_op(struct ggml_tensor * dst, int ith, int nth, void * userdata) {
++    const MixParams p = *static_cast<const MixParams *>(userdata);
++#if MODCHIP_INK2_HAS_AVX512_TARGET
++    if (has_avx512f()) {
++        fused_mix_avx512(dst, ith, nth, p);
++        return;
++    }
++#endif
++    const struct ggml_tensor * query = dst->src[0];
++    const int M = p.n_states;
++    const int64_t n_embd = dst->ne[0], n_q = dst->ne[1], n_tokens = dst->ne[2];
++    const float inv_n_embd = 1.0f / (float) n_embd;
++    const int64_t dt = (n_tokens + nth - 1) / nth;
++    const int64_t t0 = dt * ith, t1 = (t0 + dt < n_tokens) ? (t0 + dt) : n_tokens;
++    const float * q_ptrs[8];
++    for (int64_t q = 0; q < n_q; ++q) q_ptrs[q] = (const float *) ((const char *) query->data + q * query->nb[1]);
++    for (int64_t t = t0; t < t1; ++t) {
++        const float * s_ptrs[GGML_MAX_SRC];
++        float rms_inv[GGML_MAX_SRC], scores[8][GGML_MAX_SRC], eff_w[8][GGML_MAX_SRC];
++        for (int m = 0; m < M; ++m) {
++            const struct ggml_tensor * st = dst->src[1 + m];
++            const float * sp = (const float *) ((const char *) st->data + t * st->nb[1]);
++            s_ptrs[m] = sp;
++            float sum_sq = 0.0f, dots[8] = {0.0f};
++            for (int64_t i = 0; i < n_embd; ++i) {
++                const float v = sp[i]; sum_sq += v * v;
++                for (int64_t q = 0; q < n_q; ++q) dots[q] += v * q_ptrs[q][i];
++            }
++            rms_inv[m] = 1.0f / std::sqrt(sum_sq * inv_n_embd + 1e-6f);
++            for (int64_t q = 0; q < n_q; ++q) scores[q][m] = dots[q] * rms_inv[m] * p.inv_sqrt_d;
++        }
++        for (int64_t q = 0; q < n_q; ++q) {
++            float smax = scores[q][0]; for (int m = 1; m < M; ++m) if (scores[q][m] > smax) smax = scores[q][m];
++            float ssum = 0.0f, exps[GGML_MAX_SRC];
++            for (int m = 0; m < M; ++m) { exps[m] = std::exp(scores[q][m] - smax); ssum += exps[m]; }
++            for (int m = 0; m < M; ++m) eff_w[q][m] = (exps[m] / ssum) * rms_inv[m];
++            float * out = (float *) ((char *) dst->data + q * dst->nb[1] + t * dst->nb[2]);
++            for (int64_t i = 0; i < n_embd; ++i) {
++                float acc = s_ptrs[0][i] * eff_w[q][0];
++                for (int m = 1; m < M; ++m) acc += s_ptrs[m][i] * eff_w[q][m];
++                out[i] = acc;
++            }
++        }
++    }
++}
++
++inline void fused_convolve_op(struct ggml_tensor * dst, int ith, int nth, void * userdata) {
++    const ConvParams p = *static_cast<const ConvParams *>(userdata);
++    const struct ggml_tensor * cur     = dst->src[0];
++    const struct ggml_tensor * x       = dst->src[1];
++    const struct ggml_tensor * weight  = dst->src[2];
++    const struct ggml_tensor * dynamic = p.has_dynamic ? dst->src[3] : nullptr;
++
++    const int64_t n_channels   = dst->ne[0];
++    const int64_t n_tokens     = dst->ne[1];
++    const int64_t n_conv       = p.n_conv;
++    const int64_t n_seq_tokens = p.n_seq_tokens;
++    const float   inv_sqrt     = p.inv_sqrt;
++
++    const int64_t n_heads  = dynamic ? (dynamic->ne[0] / n_conv) : 0;
++    const int64_t head_dim = dynamic ? (n_channels / n_heads) : 1;
++
++    const int64_t dt = (n_tokens + nth - 1) / nth;
++    const int64_t t0 = dt * ith;
++    const int64_t t1 = (t0 + dt < n_tokens) ? (t0 + dt) : n_tokens;
++
++    for (int64_t tok = t0; tok < t1; ++tok) {
++        const int64_t is = tok / n_seq_tokens;
++        const int64_t it = tok % n_seq_tokens;
++
++        const float * cur_row = (const float *) ((const char *) cur->data + tok * cur->nb[1]);
++        float       * dst_row = (float *)       ((char *) dst->data       + tok * dst->nb[1]);
++        const char  * x_seq   = (const char *) x->data + is * x->nb[2];
++        const float * dyn_row = dynamic ? (const float *) ((const char *) dynamic->data + tok * dynamic->nb[1]) : nullptr;
++
++        if (n_conv == 4) {
++            if (!dynamic) {
++                for (int64_t ic = 0; ic < n_channels; ++ic) {
++                    const float * xp = (const float *) (x_seq + ic * x->nb[1]) + it;
++                    const float * wp = (const float *) ((const char *) weight->data + ic * weight->nb[1]);
++                    const float out = xp[0] * wp[0] + xp[1] * wp[1] + xp[2] * wp[2] + xp[3] * wp[3];
++                    dst_row[ic] = (cur_row[ic] + out) * inv_sqrt;
++                }
++            } else {
++                for (int64_t h = 0; h < n_heads; ++h) {
++                    const float d0 = dyn_row[h * 4 + 0], d1 = dyn_row[h * 4 + 1], d2 = dyn_row[h * 4 + 2], d3 = dyn_row[h * 4 + 3];
++                    const int64_t c0 = h * head_dim, c1 = c0 + head_dim;
++                    for (int64_t ic = c0; ic < c1; ++ic) {
++                        const float * xp = (const float *) (x_seq + ic * x->nb[1]) + it;
++                        const float * wp = (const float *) ((const char *) weight->data + ic * weight->nb[1]);
++                        float out = xp[0] * wp[0] + xp[1] * wp[1] + xp[2] * wp[2] + xp[3] * wp[3];
++                        out += xp[3] * d0 + xp[2] * d1 + xp[1] * d2 + xp[0] * d3;
++                        dst_row[ic] = (cur_row[ic] + out) * inv_sqrt;
++                    }
++                }
++            }
++        } else {
++            for (int64_t ic = 0; ic < n_channels; ++ic) {
++                const float * xp = (const float *) (x_seq + ic * x->nb[1]) + it;
++                const float * wp = (const float *) ((const char *) weight->data + ic * weight->nb[1]);
++                float out = 0.0f;
++                for (int64_t k = 0; k < n_conv; ++k) out += xp[k] * wp[k];
++                if (dynamic) {
++                    const float * dp = dyn_row + (ic / head_dim) * n_conv;
++                    for (int64_t lag = 0; lag < n_conv; ++lag) out += xp[n_conv - 1 - lag] * dp[lag];
++                }
++                dst_row[ic] = (cur_row[ic] + out) * inv_sqrt;
++            }
++        }
++    }
++}
++
++inline void fused_dual_rms_concat_op(struct ggml_tensor * dst, int ith, int nth, void * /*userdata*/) {
++#if MODCHIP_INK2_HAS_AVX512_TARGET
++    if (has_avx512f()) {
++        fused_dual_rms_concat_avx512(dst, ith, nth);
++        return;
++    }
++#endif
++    const struct ggml_tensor * a = dst->src[0], * b = dst->src[1];
++    const int64_t n_embd = a->ne[0], n_tokens = dst->ne[1];
++    const float inv_n = 1.0f / (float) n_embd;
++    const int64_t dt = (n_tokens + nth - 1) / nth;
++    const int64_t t0 = dt * ith, t1 = (t0 + dt < n_tokens) ? (t0 + dt) : n_tokens;
++    for (int64_t t = t0; t < t1; ++t) {
++        const float * xa = (const float *) ((const char *) a->data + t * a->nb[1]);
++        const float * xb = (const float *) ((const char *) b->data + t * b->nb[1]);
++        float * y0 = (float *) ((char *) dst->data + t * dst->nb[1]), * y1 = y0 + n_embd;
++        float sqa = 0.0f, sqb = 0.0f;
++        for (int64_t i = 0; i < n_embd; ++i) { sqa += xa[i] * xa[i]; sqb += xb[i] * xb[i]; }
++        const float ra = 1.0f / std::sqrt(sqa * inv_n + 1e-6f);
++        const float rb = 1.0f / std::sqrt(sqb * inv_n + 1e-6f);
++        for (int64_t i = 0; i < n_embd; ++i) { y0[i] = xa[i] * ra; y1[i] = xb[i] * rb; }
++    }
++}
++
++inline void fused_control_mix_op(struct ggml_tensor * dst, int ith, int nth, void * /*userdata*/) {
++#if MODCHIP_INK2_HAS_AVX512_TARGET
++    if (has_avx512f()) {
++        fused_control_mix_avx512(dst, ith, nth);
++        return;
++    }
++#endif
++    const struct ggml_tensor * a_cur = dst->src[0], * a_msg = dst->src[1], * a_fgt = dst->src[2], * a_gn = dst->src[3];
++    const int64_t ne0 = dst->ne[0], ne1 = dst->ne[1];
++    const int64_t dt = (ne1 + nth - 1) / nth;
++    const int64_t t0 = dt * ith, t1 = (t0 + dt < ne1) ? (t0 + dt) : ne1;
++    for (int64_t t = t0; t < t1; ++t) {
++        const float * xc = (const float *) ((const char *) a_cur->data + t * a_cur->nb[1]);
++        const float * xm = (const float *) ((const char *) a_msg->data + t * a_msg->nb[1]);
++        const float * xf = (const float *) ((const char *) a_fgt->data + t * a_fgt->nb[1]);
++        const float * xg = (const float *) ((const char *) a_gn->data  + t * a_gn->nb[1]);
++        float       * y  = (float *)       ((char *) dst->data         + t * dst->nb[1]);
++        for (int64_t i = 0; i < ne0; ++i) {
++            const float c = xc[i];
++            y[i] = (c - std::tanh(xf[i]) * c) + std::tanh(xg[i]) * xm[i];
++        }
++    }
++}
++
++inline void fused_mul_sigmoid_op(
++        struct ggml_tensor * dst,
++        const struct ggml_tensor * a,
++        const struct ggml_tensor * b,
++        int ith, int nth, void * /*userdata*/) {
++#if MODCHIP_INK2_HAS_AVX512_TARGET
++    if (has_avx512f()) {
++        fused_mul_sigmoid_avx512(dst, a, b, ith, nth);
++        return;
++    }
++#endif
++    const int64_t ne0 = dst->ne[0], ne1 = dst->ne[1], ne2 = dst->ne[2], ne3 = dst->ne[3];
++    const int64_t nrows = ne1 * ne2 * ne3;
++    const int64_t dr = (nrows + nth - 1) / nth;
++    const int64_t r0 = dr * ith, r1 = (r0 + dr < nrows) ? (r0 + dr) : nrows;
++    for (int64_t r = r0; r < r1; ++r) {
++        const int64_t i1 = r % ne1, rem = r / ne1, i2 = rem % ne2, i3 = rem / ne2;
++        const float * xa = (const float *) ((const char *) a->data + i1 * a->nb[1] + i2 * a->nb[2] + i3 * a->nb[3]);
++        const float * xb = (const float *) ((const char *) b->data + i1 * b->nb[1] + i2 * b->nb[2] + i3 * b->nb[3]);
++        float       * y  = (float *)       ((char *) dst->data     + i1 * dst->nb[1] + i2 * dst->nb[2] + i3 * dst->nb[3]);
++        for (int64_t i0 = 0; i0 < ne0; ++i0) y[i0] = xa[i0] / (1.0f + std::exp(-xb[i0]));
++    }
++}
++
++inline void fused_rel_bias_gather_op(struct ggml_tensor * dst, int ith, int nth, void * /*userdata*/) {
++#if MODCHIP_INK2_HAS_AVX512_TARGET
++    if (has_avx512f()) {
++        fused_rel_bias_gather_avx512(dst, ith, nth);
++        return;
++    }
++#endif
++    const struct ggml_tensor * bias = dst->src[0], * rcur = dst->src[1], * sinks = dst->src[2], * rel_pos = dst->src[3];
++    const int64_t n_kv = dst->ne[0], n_tps = dst->ne[1], n_head = dst->ne[2], n_stream = dst->ne[3];
++    const int64_t n_rel = bias->ne[0], n_extent = bias->ne[1];
++    const int64_t total_ht = n_head * n_tps * n_stream;
++    const int64_t d_ht = (total_ht + nth - 1) / nth;
++    const int64_t j0 = d_ht * ith, j1 = (j0 + d_ht < total_ht) ? (j0 + d_ht) : total_ht;
++    for (int64_t j = j0; j < j1; ++j) {
++        const int64_t ih = j % n_head, rem = j / n_head, it_s = rem % n_tps, is = rem / n_tps;
++        const int64_t tok = it_s + is * n_tps;
++        const float * r_row = (const float *) ((const char *) rcur->data + ih * rcur->nb[1] + tok * rcur->nb[2]);
++        const float sink = ((const float *) ((const char *) sinks->data + tok * sinks->nb[1]))[ih];
++        const int32_t * rp = (const int32_t *) ((const char *) rel_pos->data + tok * rel_pos->nb[1]);
++        float * out = (float *) ((char *) dst->data + it_s * dst->nb[1] + ih * dst->nb[2] + is * dst->nb[3]);
++        for (int64_t ikv = 0; ikv < n_kv; ++ikv) {
++            const int32_t d = rp[ikv];
++            if ((uint32_t) d >= (uint32_t) n_extent) { out[ikv] = -sink; }
++            else {
++                const float * bp = (const float *) ((const char *) bias->data + (int64_t) d * bias->nb[1]);
++                float sum = 0.0f;
++                for (int64_t k = 0; k < n_rel; ++k) sum += r_row[k] * bp[k];
++                out[ikv] = sum - sink;
++            }
++        }
++    }
++}
++
++inline void fused_softcap_unpad_op(struct ggml_tensor * dst, int ith, int nth, void * userdata) {
++    const float cap = *static_cast<const float *>(userdata);
++#if MODCHIP_INK2_HAS_AVX512_TARGET
++    if (has_avx512f()) {
++        fused_softcap_unpad_avx512(dst, ith, nth, cap);
++        return;
++    }
++#endif
++    const float inv_cap = (cap != 0.0f) ? (1.0f / cap) : 0.0f;
++    const struct ggml_tensor * src = dst->src[0];
++    const int64_t n_unpad = dst->ne[0], n_out = dst->ne[1];
++    const int64_t chunk = (n_unpad + nth - 1) / nth;
++    const int64_t c0 = chunk * ith, c1 = (c0 + chunk < n_unpad) ? (c0 + chunk) : n_unpad;
++    for (int64_t r = 0; r < n_out; ++r) {
++        const float * x = (const float *) ((const char *) src->data + r * src->nb[1]);
++        float       * y = (float *)       ((char *) dst->data       + r * dst->nb[1]);
++        if (cap != 0.0f) { for (int64_t i = c0; i < c1; ++i) y[i] = cap * std::tanh(x[i] * inv_cap); }
++        else if (c1 > c0) { std::memcpy(y + c0, x + c0, (size_t) (c1 - c0) * sizeof(float)); }
++    }
++}
++
++// =============================================================================
++// 9. Fused RMSNorm + per-channel weight multiply (`rms_norm(x, eps) * w`)
++//    Replaces 2 nodes (ggml_rms_norm + ggml_mul) -> 1 node (-138 barriers/tok)
++// =============================================================================
++#if MODCHIP_INK2_HAS_AVX512_TARGET
++MODCHIP_AVX512_FN inline void fused_rms_norm_mul_avx512(
++        struct ggml_tensor * dst,
++        const struct ggml_tensor * a,
++        const struct ggml_tensor * w,
++        int ith, int nth, const float eps) {
++    const int64_t ne0 = dst->ne[0], ne1 = dst->ne[1], ne2 = dst->ne[2], ne3 = dst->ne[3];
++    const int64_t nrows = ne1 * ne2 * ne3;
++    const float inv_n = 1.0f / (float) ne0;
++    const int64_t dr = (nrows + nth - 1) / nth;
++    const int64_t r0 = dr * ith;
++    const int64_t r1 = (r0 + dr < nrows) ? (r0 + dr) : nrows;
++    const float * wp = (const float *) w->data;
++
++    for (int64_t r = r0; r < r1; ++r) {
++        const int64_t i1 = r % ne1, rem = r / ne1, i2 = rem % ne2, i3 = rem / ne2;
++        const float * x = (const float *) ((const char *) a->data + i1 * a->nb[1] + i2 * a->nb[2] + i3 * a->nb[3]);
++        float       * y = (float *)       ((char *) dst->data     + i1 * dst->nb[1] + i2 * dst->nb[2] + i3 * dst->nb[3]);
++
++        __m512 vsq = _mm512_setzero_ps();
++        int64_t i0 = 0;
++        for (; i0 + 15 < ne0; i0 += 16) {
++            const __m512 vx = _mm512_loadu_ps(x + i0);
++            vsq = _mm512_fmadd_ps(vx, vx, vsq);
++        }
++        float sum_sq = _mm512_reduce_add_ps(vsq);
++        for (; i0 < ne0; ++i0) sum_sq += x[i0] * x[i0];
++
++        const float scale = 1.0f / std::sqrt(sum_sq * inv_n + eps);
++        const __m512 vs = _mm512_set1_ps(scale);
++        i0 = 0;
++        for (; i0 + 15 < ne0; i0 += 16) {
++            const __m512 vx = _mm512_loadu_ps(x + i0);
++            const __m512 vw = _mm512_loadu_ps(wp + i0);
++            _mm512_storeu_ps(y + i0, _mm512_mul_ps(_mm512_mul_ps(vx, vs), vw));
++        }
++        for (; i0 < ne0; ++i0) y[i0] = (x[i0] * scale) * wp[i0];
++    }
++}
++#endif
++
++inline void fused_rms_norm_mul_op(
++        struct ggml_tensor * dst,
++        const struct ggml_tensor * a,
++        const struct ggml_tensor * w,
++        int ith, int nth, void * userdata) {
++    const float eps = *static_cast<const float *>(userdata);
++#if MODCHIP_INK2_HAS_AVX512_TARGET
++    if (has_avx512f()) {
++        fused_rms_norm_mul_avx512(dst, a, w, ith, nth, eps);
++        return;
++    }
++#endif
++    const int64_t ne0 = dst->ne[0], ne1 = dst->ne[1], ne2 = dst->ne[2], ne3 = dst->ne[3];
++    const int64_t nrows = ne1 * ne2 * ne3;
++    const float inv_n = 1.0f / (float) ne0;
++    const int64_t dr = (nrows + nth - 1) / nth;
++    const int64_t r0 = dr * ith, r1 = (r0 + dr < nrows) ? (r0 + dr) : nrows;
++    const float * wp = (const float *) w->data;
++    for (int64_t r = r0; r < r1; ++r) {
++        const int64_t i1 = r % ne1, rem = r / ne1, i2 = rem % ne2, i3 = rem / ne2;
++        const float * x = (const float *) ((const char *) a->data + i1 * a->nb[1] + i2 * a->nb[2] + i3 * a->nb[3]);
++        float       * y = (float *)       ((char *) dst->data     + i1 * dst->nb[1] + i2 * dst->nb[2] + i3 * dst->nb[3]);
++        float sum_sq = 0.0f;
++        for (int64_t i0 = 0; i0 < ne0; ++i0) sum_sq += x[i0] * x[i0];
++        const float scale = 1.0f / std::sqrt(sum_sq * inv_n + eps);
++        for (int64_t i0 = 0; i0 < ne0; ++i0) y[i0] = (x[i0] * scale) * wp[i0];
++    }
++}
++
++// =============================================================================
++// 10. Fused MoE Router Top-K + Weight Normalize + Scale (for Sigmoid Gating)
++//     Replaces add(bias) + argsort_top_k + get_rows + sum_rows + scale_bias + div + scale
++//     (7 nodes -> 2 tiny ops, -240 barriers/tok; preserves router `probs` tensor)
++// =============================================================================
++struct MoeRouterWParams {
++    int   norm_w;
++    float norm_eps;
++    float w_scale;
++};
++
++inline void * intern_moe_router_w_params(int norm_w, float norm_eps, float w_scale) {
++    static constexpr int MAX_SLOTS = 32;
++    static MoeRouterWParams slots[MAX_SLOTS];
++    static std::atomic<int> count{0};
++    const int n = count.load(std::memory_order_acquire);
++    for (int i = 0; i < n && i < MAX_SLOTS; ++i) {
++        if (slots[i].norm_w == norm_w && slots[i].norm_eps == norm_eps && slots[i].w_scale == w_scale) {
++            return &slots[i];
++        }
++    }
++    const int idx = count.fetch_add(1, std::memory_order_acq_rel);
++    if (idx < MAX_SLOTS) {
++        slots[idx] = MoeRouterWParams{ norm_w, norm_eps, w_scale };
++        return &slots[idx];
++    }
++    return &slots[0];
++}
++
++// dst->src[0] = probs [n_expert, n_tokens], optional dst->src[1] = exp_probs_b [n_expert]
++// dst = selected_experts [n_expert_used, n_tokens] (I32)
++inline void fused_moe_probs_topk_idx_op(struct ggml_tensor * dst, int ith, int nth, void * /*userdata*/) {
++    const struct ggml_tensor * probs = dst->src[0];
++    const struct ggml_tensor * bias  = dst->src[1];
++    const int64_t n_expert = probs->ne[0];
++    const int64_t k_used   = dst->ne[0];
++    const int64_t n_tokens = dst->ne[1];
++    const float * bp = bias ? (const float *) bias->data : nullptr;
++
++    const int64_t dt = (n_tokens + nth - 1) / nth;
++    const int64_t t0 = dt * ith;
++    const int64_t t1 = (t0 + dt < n_tokens) ? (t0 + dt) : n_tokens;
++
++    for (int64_t t = t0; t < t1; ++t) {
++        const float * pr  = (const float *) ((const char *) probs->data + t * probs->nb[1]);
++        int32_t     * out = (int32_t *)     ((char *) dst->data         + t * dst->nb[1]);
++
++        float   top_v[64];
++        int32_t top_i[64];
++        int filled = 0;
++        const int K = (int) k_used;
++
++        for (int32_t e = 0; e < (int32_t) n_expert; ++e) {
++            const float v = bp ? (pr[e] + bp[e]) : pr[e];
++            if (filled < K) {
++                int pos = filled++;
++                while (pos > 0 && v > top_v[pos - 1]) {
++                    top_v[pos] = top_v[pos - 1];
++                    top_i[pos] = top_i[pos - 1];
++                    --pos;
++                }
++                top_v[pos] = v;
++                top_i[pos] = e;
++            } else if (v > top_v[K - 1]) {
++                int pos = K - 1;
++                while (pos > 0 && v > top_v[pos - 1]) {
++                    top_v[pos] = top_v[pos - 1];
++                    top_i[pos] = top_i[pos - 1];
++                    --pos;
++                }
++                top_v[pos] = v;
++                top_i[pos] = e;
++            }
++        }
++        for (int j = 0; j < K; ++j) {
++            out[j] = top_i[j];
++        }
++    }
++}
++
++// dst->src[0] = probs [n_expert, n_tokens], dst->src[1] = selected_experts [k, n_tokens] (I32)
++// dst = weights [1, k, n_tokens] (F32)
++inline void fused_moe_topk_norm_w_op(struct ggml_tensor * dst, int ith, int nth, void * userdata) {
++    const MoeRouterWParams p = *static_cast<const MoeRouterWParams *>(userdata);
++    const struct ggml_tensor * probs = dst->src[0];
++    const struct ggml_tensor * ids   = dst->src[1];
++    const int64_t k_used   = dst->ne[1];
++    const int64_t n_tokens = dst->ne[2];
++
++    const int64_t dt = (n_tokens + nth - 1) / nth;
++    const int64_t t0 = dt * ith;
++    const int64_t t1 = (t0 + dt < n_tokens) ? (t0 + dt) : n_tokens;
++
++    for (int64_t t = t0; t < t1; ++t) {
++        const float   * pr  = (const float *)   ((const char *) probs->data + t * probs->nb[1]);
++        const int32_t * id  = (const int32_t *) ((const char *) ids->data   + t * ids->nb[1]);
++        float         * out = (float *)         ((char *) dst->data         + t * dst->nb[2]);
++
++        float vals[64];
++        float sum = 0.0f;
++        for (int64_t j = 0; j < k_used; ++j) {
++            const float w = pr[id[j]];
++            vals[j] = w;
++            sum += w;
++        }
++        float mul = 1.0f;
++        if (p.norm_w) {
++            const float denom = (p.norm_eps > 0.0f)
++                ? (sum + p.norm_eps)
++                : ((sum > 6.103515625e-5f) ? sum : 6.103515625e-5f);
++            mul = 1.0f / denom;
++        }
++        if (p.w_scale != 0.0f && p.w_scale != 1.0f) {
++            mul *= p.w_scale;
++        }
++        for (int64_t j = 0; j < k_used; ++j) {
++            out[j] = vals[j] * mul;
++        }
++    }
++}
++
++} // namespace modchip_ink2
 diff --git a/src/llama-kv-cache-dsv4.cpp b/src/llama-kv-cache-dsv4.cpp
 index 9c0a9b2..3709c99 100644
 --- a/src/llama-kv-cache-dsv4.cpp
@@ -15322,6 +16851,418 @@ index 69ebe5a..f56b0a2 100644
              layer.ffn_exp_probs_b,
              n_expert, hparams.n_expert_used(),
              LLM_FFN_SILU, hparams.expert_weights_norm,
+diff --git a/src/models/inkling2.cpp b/src/models/inkling2.cpp
+index 3e43ef4..104fcf1 100644
+--- a/src/models/inkling2.cpp
++++ b/src/models/inkling2.cpp
+@@ -1,5 +1,6 @@
+ #include "models.h"
+ #include "../llama-memory-hybrid-iswa.h"
++#include "../llama-inkling2-fused.h"
+ 
+ void llama_model_inkling2::load_arch_hparams(llama_model_loader & ml) {
+     ml.get_key(LLM_KV_ATTENTION_LAYERNORM_RMS_EPS, hparams.f_norm_rms_eps);
+@@ -161,7 +162,34 @@ std::unique_ptr<llm_graph_context> llama_model_inkling2::build_arch_graph(const
+ }
+ 
+ // scale each row down to an L2 norm of at most threshold, after the optional per-channel scale
+-ggml_tensor * llama_model_inkling2::graph::clip(ggml_tensor * cur, ggml_tensor * scale, float threshold) {
++ggml_tensor * llama_model_inkling2::graph::clip(ggml_tensor * cur, ggml_tensor * scale, float threshold, ggml_tensor * tau_mul) {
++    if (layer_on_cpu && modchip_ink2::fusion_enabled(1) &&
++        cur->type == GGML_TYPE_F32 &&
++        (!scale || scale->type == GGML_TYPE_F32) &&
++        (!tau_mul || tau_mul->type == GGML_TYPE_F32)) {
++        ggml_tensor * args[3] = { cur, nullptr, nullptr };
++        int n_args    = 1;
++        int scale_idx = -1;
++        int tau_idx   = -1;
++        if (scale) {
++            scale_idx = n_args;
++            args[n_args++] = scale;
++        }
++        if (tau_mul) {
++            tau_idx = n_args;
++            args[n_args++] = tau_mul;
++        }
++        const int64_t nrows   = cur->ne[1] * cur->ne[2] * cur->ne[3];
++        const int     n_tasks = modchip_ink2::choose_n_tasks(cur->ne[0] * nrows, nrows);
++        return ggml_custom_4d(
++                ctx0, GGML_TYPE_F32,
++                cur->ne[0], cur->ne[1], cur->ne[2], cur->ne[3],
++                args, n_args,
++                modchip_ink2::fused_clip_op,
++                n_tasks,
++                modchip_ink2::intern_clip_params(threshold, scale_idx, tau_idx));
++    }
++
+     if (scale) {
+         cur = ggml_mul(ctx0, cur, scale);
+     }
+@@ -171,11 +199,47 @@ ggml_tensor * llama_model_inkling2::graph::clip(ggml_tensor * cur, ggml_tensor *
+ 
+     ggml_tensor * factor = ggml_div(ctx0, ggml_fill(ctx0, norm, threshold), norm);
+ 
+-    return ggml_mul(ctx0, cur, ggml_clamp(ctx0, factor, 0.0f, 1.0f));
++    cur = ggml_mul(ctx0, cur, ggml_clamp(ctx0, factor, 0.0f, 1.0f));
++    if (tau_mul) {
++        cur = ggml_mul(ctx0, cur, tau_mul);
++    }
++    return cur;
+ }
+ 
+ // attention over the depth: mix the earlier block outputs and cur with learned queries
+ ggml_tensor * llama_model_inkling2::graph::mix(const std::vector<ggml_tensor *> & blocks, ggml_tensor * cur, ggml_tensor * query) {
++    if (modchip_ink2::tensor_on_cpu(query) && modchip_ink2::fusion_enabled(2) &&
++        cur->type == GGML_TYPE_F32 &&
++        query->type == GGML_TYPE_F32 &&
++        query->ne[1] <= 8 &&
++        (int) blocks.size() + 2 <= GGML_MAX_SRC) {
++        bool all_f32 = true;
++        for (ggml_tensor * b : blocks) {
++            if (b->type != GGML_TYPE_F32) {
++                all_f32 = false;
++                break;
++            }
++        }
++        if (all_f32) {
++            ggml_tensor * args[GGML_MAX_SRC];
++            args[0] = query;
++            args[1] = cur;
++            int n_args = 2;
++            for (ggml_tensor * b : blocks) {
++                args[n_args++] = b;
++            }
++            const int n_states = 1 + (int) blocks.size();
++            const int n_tasks  = modchip_ink2::choose_n_tasks(n_embd * n_tokens * n_states, n_tokens);
++            return ggml_custom_4d(
++                    ctx0, GGML_TYPE_F32,
++                    n_embd, query->ne[1], n_tokens, 1,
++                    args, n_args,
++                    modchip_ink2::fused_mix_op,
++                    n_tasks,
++                    modchip_ink2::intern_mix_params(n_states, 1.0f / sqrtf((float) n_embd)));
++        }
++    }
++
+     ggml_tensor * states = ggml_reshape_3d(ctx0, cur, n_embd, 1, n_tokens);
+     for (ggml_tensor * block : blocks) {
+         states = ggml_concat(ctx0, ggml_reshape_3d(ctx0, block, n_embd, 1, n_tokens), states, 1);
+@@ -212,6 +276,25 @@ ggml_tensor * llama_model_inkling2::graph::convolve(
+ 
+     build_conv_state_store(inp, state, x, n_conv - 1, offset*(n_conv - 1)*ggml_element_size(state));
+ 
++    const float inv_sqrt = 1.0f / sqrtf((float) ((dynamic ? 2 : 1) * n_conv + 1));
++
++    if (modchip_ink2::tensor_on_cpu(weight) && modchip_ink2::fusion_enabled(3) &&
++        cur->type == GGML_TYPE_F32 &&
++        x->type == GGML_TYPE_F32 &&
++        weight->type == GGML_TYPE_F32 &&
++        (!dynamic || dynamic->type == GGML_TYPE_F32)) {
++        ggml_tensor * args[4] = { cur, x, weight, dynamic };
++        const int n_args  = dynamic ? 4 : 3;
++        const int n_tasks = modchip_ink2::choose_n_tasks(n_channels * n_tokens, n_tokens);
++        return ggml_custom_4d(
++                ctx0, GGML_TYPE_F32,
++                n_channels, n_tokens, 1, 1,
++                args, n_args,
++                modchip_ink2::fused_convolve_op,
++                n_tasks,
++                modchip_ink2::intern_conv_params(n_conv, n_seq_tokens, n_seqs, dynamic ? 1 : 0, inv_sqrt));
++    }
++
+     ggml_tensor * out = ggml_ssm_conv(ctx0, x, weight);
+     out = ggml_reshape_2d(ctx0, out, n_channels, n_tokens);
+ 
+@@ -233,11 +316,37 @@ ggml_tensor * llama_model_inkling2::graph::convolve(
+         }
+     }
+ 
+-    return ggml_scale(ctx0, ggml_add(ctx0, cur, out), 1.0f/sqrtf((dynamic ? 2 : 1)*n_conv + 1));
++    return ggml_scale(ctx0, ggml_add(ctx0, cur, out), inv_sqrt);
+ }
+ 
+ // mix a cross-pass message into a looped layer input: (1 - forget)*cur + gain*message, both gated on cur and message
+ ggml_tensor * llama_model_inkling2::graph::control(ggml_tensor * cur, ggml_tensor * message, const loop_layer & loop, int ctrl) {
++    if (modchip_ink2::tensor_on_cpu(loop.ctrl_down[ctrl]) && modchip_ink2::fusion_enabled(4) && cur->type == GGML_TYPE_F32 && message->type == GGML_TYPE_F32) {
++        const int n_tasks_cat = modchip_ink2::choose_n_tasks(2 * n_embd * n_tokens, n_tokens);
++        ggml_tensor * cat_args[2] = { cur, message };
++        ggml_tensor * gate = ggml_custom_4d(
++                ctx0, GGML_TYPE_F32,
++                2 * n_embd, n_tokens, 1, 1,
++                cat_args, 2,
++                modchip_ink2::fused_dual_rms_concat_op,
++                n_tasks_cat,
++                nullptr);
++        gate = build_lora_mm(loop.ctrl_down[ctrl], gate);
++
++        ggml_tensor * gain_raw   = build_lora_mm(loop.ctrl_gain[ctrl],   gate);
++        ggml_tensor * forget_raw = build_lora_mm(loop.ctrl_forget[ctrl], gate);
++
++        const int n_tasks_mix = modchip_ink2::choose_n_tasks(n_embd * n_tokens, n_tokens);
++        ggml_tensor * mix_args[4] = { cur, message, forget_raw, gain_raw };
++        return ggml_custom_4d(
++                ctx0, GGML_TYPE_F32,
++                n_embd, n_tokens, 1, 1,
++                mix_args, 4,
++                modchip_ink2::fused_control_mix_op,
++                n_tasks_mix,
++                nullptr);
++    }
++
+     ggml_tensor * gate = ggml_concat(ctx0, ggml_rms_norm(ctx0, cur, 1e-6f), ggml_rms_norm(ctx0, message, 1e-6f), 0);
+     gate = build_lora_mm(loop.ctrl_down[ctrl], gate);
+ 
+@@ -247,6 +356,19 @@ ggml_tensor * llama_model_inkling2::graph::control(ggml_tensor * cur, ggml_tenso
+     return ggml_add(ctx0, ggml_sub(ctx0, cur, ggml_mul(ctx0, forget, cur)), ggml_mul(ctx0, gain, message));
+ }
+ 
++ggml_tensor * llama_model_inkling2::graph::norm_rms(ggml_tensor * cur, ggml_tensor * weight, int il) {
++    if (modchip_ink2::tensor_on_cpu(weight) && modchip_ink2::fusion_enabled(8) && weight && cur->type == GGML_TYPE_F32 && weight->type == GGML_TYPE_F32) {
++        const int64_t nrows = cur->ne[1] * cur->ne[2] * cur->ne[3];
++        const int n_tasks   = modchip_ink2::choose_n_tasks(cur->ne[0] * nrows, nrows);
++        return ggml_map_custom2(
++                ctx0, cur, weight,
++                modchip_ink2::fused_rms_norm_mul_op,
++                n_tasks,
++                modchip_ink2::intern_float_param(hparams.f_norm_rms_eps));
++    }
++    return build_norm(cur, weight, nullptr, LLM_NORM_RMS, il);
++}
++
+ ggml_tensor * llama_model_inkling2::graph::build_inputs() {
+     inp  = build_inp_mem_hybrid_iswa_rel(hparams.n_relative_extent, hparams.n_swa);
+     attn = inp->get_attn();
+@@ -262,9 +384,11 @@ ggml_tensor * llama_model_inkling2::graph::build_inputs() {
+ 
+     ggml_tensor * cur = build_inp_embd(model.tok_embd);
+ 
++    layer_on_cpu = modchip_ink2::tensor_on_cpu(model.tok_norm);
++
+     // important: do not normalize raw embeddings input (i.e. encoded image embeddings)
+     if (ubatch.token) {
+-        cur = build_norm(cur, model.tok_norm, nullptr, LLM_NORM_RMS, -1);
++        cur = norm_rms(cur, model.tok_norm, -1);
+     }
+ 
+     return cur;
+@@ -275,6 +399,7 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
+     GGML_ASSERT(!messages == !loop);
+ 
+     const auto & layer = model.layers[il];
++    layer_on_cpu = modchip_ink2::tensor_on_cpu(layer.wq);
+ 
+     const bool    is_swa       = hparams.is_swa(il);
+     const int64_t n_head       = hparams.n_head(il);
+@@ -284,7 +409,8 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
+ 
+     // the message of controller ctrl, [n_embd, n_tokens]
+     auto message = [&](int ctrl) {
+-        return ggml_cont(ctx0, ggml_view_2d(ctx0, messages, n_embd, n_tokens, messages->nb[2], ctrl*messages->nb[1]));
++        ggml_tensor * v = ggml_view_2d(ctx0, messages, n_embd, n_tokens, messages->nb[2], ctrl*messages->nb[1]);
++        return (layer_on_cpu && modchip_ink2::fusion_enabled(4)) ? v : ggml_cont(ctx0, v);
+     };
+ 
+     ggml_tensor * state   = recr->mctx->get_r_l(il);
+@@ -311,35 +437,36 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
+ 
+     if (is_swa && messages) {
+         for (int j = 0; j < 3; ++j) {
+-            inputs[j] = build_norm(inputs[j], layer.attn_norm, nullptr, LLM_NORM_RMS, il);
++            inputs[j] = norm_rms(inputs[j], layer.attn_norm, il);
+         }
+     } else if (is_swa) {
+-        inputs[0] = build_norm(inputs[0], layer.attn_norm, nullptr, LLM_NORM_RMS, il);
++        inputs[0] = norm_rms(inputs[0], layer.attn_norm, il);
+         inputs[1] = inputs[2] = inputs[0];
+     } else {
+-        inputs[0] = build_norm(inputs[0], layer.attn_q_inp_norm, nullptr, LLM_NORM_RMS, il);
+-        inputs[1] = build_norm(inputs[1], layer.attn_k_inp_norm, nullptr, LLM_NORM_RMS, il);
+-        inputs[2] = build_norm(inputs[2], layer.attn_v_inp_norm, nullptr, LLM_NORM_RMS, il);
++        inputs[0] = norm_rms(inputs[0], layer.attn_q_inp_norm, il);
++        inputs[1] = norm_rms(inputs[1], layer.attn_k_inp_norm, il);
++        inputs[2] = norm_rms(inputs[2], layer.attn_v_inp_norm, il);
+     }
+ 
+-    // self-attention
++    // self-attention: group all inputs[0] projections consecutively for 100% q8_cache reuse
+     {
+-        ggml_tensor * Qcur = build_lora_mm(layer.wq, inputs[0]);
+-        ggml_tensor * Kcur = convolve(build_lora_mm(layer.wk, inputs[1]), layer.attn_k_conv,
+-                is_swa ? nullptr : build_lora_mm(layer.attn_k_conv_proj, inputs[1]), state, history, recr, 0);
+-        ggml_tensor * Vcur = convolve(build_lora_mm(layer.wv, inputs[2]), layer.attn_v_conv,
+-                is_swa ? nullptr : build_lora_mm(layer.attn_v_conv_proj, inputs[2]), state, history, recr, n_embd_k_gqa);
+-        ggml_tensor * Rcur = build_lora_mm(layer.attn_rel, inputs[0]);
+-
+-        Qcur = clip(ggml_reshape_3d(ctx0, Qcur, n_embd_head, n_head,    n_tokens), layer.attn_q_clip, hparams.f_qk_clip);
++        ggml_tensor * Qcur      = build_lora_mm(layer.wq,             inputs[0]);
++        ggml_tensor * Rcur      = build_lora_mm(layer.attn_rel,       inputs[0]);
++        ggml_tensor * sinks     = build_lora_mm(layer.attn_sink_proj, inputs[0]);
++        ggml_tensor * attn_gate = build_lora_mm(layer.wqkv_gate,      inputs[0]);
++        ggml_tensor * K_lin     = build_lora_mm(layer.wk,             inputs[1]);
++        ggml_tensor * K_dyn     = is_swa ? nullptr : build_lora_mm(layer.attn_k_conv_proj, inputs[1]);
++        ggml_tensor * V_lin     = build_lora_mm(layer.wv,             inputs[2]);
++        ggml_tensor * V_dyn     = is_swa ? nullptr : build_lora_mm(layer.attn_v_conv_proj, inputs[2]);
++
++        ggml_tensor * Kcur = convolve(K_lin, layer.attn_k_conv, K_dyn, state, history, recr, 0);
++        ggml_tensor * Vcur = convolve(V_lin, layer.attn_v_conv, V_dyn, state, history, recr, n_embd_k_gqa);
++
++        ggml_tensor * tau_arg = is_swa ? nullptr : tau;
++        Qcur = clip(ggml_reshape_3d(ctx0, Qcur, n_embd_head, n_head,    n_tokens), layer.attn_q_clip, hparams.f_qk_clip, tau_arg);
+         Kcur = clip(ggml_reshape_3d(ctx0, Kcur, n_embd_head, n_head_kv, n_tokens), nullptr,           hparams.f_qk_clip);
+         Vcur = ggml_rms_norm(ctx0, ggml_reshape_3d(ctx0, Vcur, n_embd_head, n_head_kv, n_tokens), hparams.f_norm_rms_eps);
+-        Rcur = clip(ggml_reshape_3d(ctx0, Rcur, hparams.n_relative, n_head, n_tokens), layer.attn_rel_clip, hparams.f_relative_clip);
+-
+-        if (!is_swa) {
+-            Qcur = ggml_mul(ctx0, Qcur, tau);
+-            Rcur = ggml_mul(ctx0, Rcur, tau);
+-        }
++        Rcur = clip(ggml_reshape_3d(ctx0, Rcur, hparams.n_relative, n_head, n_tokens), layer.attn_rel_clip, hparams.f_relative_clip, tau_arg);
+ 
+         cb(Qcur, "Qcur", il);
+         cb(Kcur, "Kcur", il);
+@@ -351,27 +478,53 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
+         const int64_t n_stream = (is_swa ? attn->self_attn_mask_swa.raw : attn->self_attn_mask.raw)->ne[3];
+         const int64_t n_kv     = rel_pos->ne[0];
+ 
+-        ggml_tensor * sinks = build_lora_mm(layer.attn_sink_proj, inputs[0]);
+-
+-        // project r on the bias table first, then gather by distance: only the gathered bias is n_kv x n_tokens x n_head
+-        ggml_tensor * table = ggml_mul_mat(ctx0, ggml_pad(ctx0, layer.attn_rel_bias, 0, 1, 0, 0), Rcur);
++        ggml_tensor * kq_b = nullptr;
++        if (layer_on_cpu && modchip_ink2::fusion_enabled(5) &&
++            layer.attn_rel_bias->type == GGML_TYPE_F32 &&
++            Rcur->type == GGML_TYPE_F32 &&
++            sinks->type == GGML_TYPE_F32 &&
++            rel_pos->type == GGML_TYPE_I32) {
++            ggml_tensor * rb_args[4] = { layer.attn_rel_bias, Rcur, sinks, rel_pos };
++            const int64_t total_ht = n_head * n_tokens;
++            const int n_tasks_rb   = modchip_ink2::choose_n_tasks(n_kv * total_ht, total_ht);
++            kq_b = ggml_custom_4d(
++                    ctx0, GGML_TYPE_F32,
++                    n_kv, n_tokens / n_stream, n_head, n_stream,
++                    rb_args, 4,
++                    modchip_ink2::fused_rel_bias_gather_op,
++                    n_tasks_rb,
++                    nullptr);
++        } else {
++            // project r on the bias table first, then gather by distance: only the gathered bias is n_kv x n_tokens x n_head
++            ggml_tensor * table = ggml_mul_mat(ctx0, ggml_pad(ctx0, layer.attn_rel_bias, 0, 1, 0, 0), Rcur);
+ 
+-        // the sink logit t is per query: exp(s - t)/(1 + sum(exp(s - t))) = exp(s)/(exp(t) + sum(exp(s))), with a zero sink
+-        table = ggml_sub(ctx0, table, ggml_reshape_3d(ctx0, sinks, 1, n_head, n_tokens));
+-        table = ggml_cont(ctx0, ggml_permute(ctx0, table, 1, 0, 2, 3));
++            // the sink logit t is per query: exp(s - t)/(1 + sum(exp(s - t))) = exp(s)/(exp(t) + sum(exp(s))), with a zero sink
++            table = ggml_sub(ctx0, table, ggml_reshape_3d(ctx0, sinks, 1, n_head, n_tokens));
++            table = ggml_cont(ctx0, ggml_permute(ctx0, table, 1, 0, 2, 3));
+ 
+-        ggml_tensor * kq_b = ggml_get_rows(ctx0, table, rel_pos);
+-        kq_b = ggml_reshape_4d(ctx0, kq_b, n_head, n_kv, n_tokens/n_stream, n_stream);
+-        kq_b = ggml_cont(ctx0, ggml_permute(ctx0, kq_b, 2, 0, 1, 3));
++            kq_b = ggml_get_rows(ctx0, table, rel_pos);
++            kq_b = ggml_reshape_4d(ctx0, kq_b, n_head, n_kv, n_tokens/n_stream, n_stream);
++            kq_b = ggml_cont(ctx0, ggml_permute(ctx0, kq_b, 2, 0, 1, 3));
++        }
+         cb(kq_b, "kq_b", il);
+ 
+-        sinks = ggml_fill(ctx0, ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, n_head), 0.0f);
++        if (!zero_sinks || zero_sinks_n_head != n_head) {
++            zero_sinks = ggml_fill(ctx0, ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, n_head), 0.0f);
++            zero_sinks_n_head = n_head;
++        }
++        sinks = zero_sinks;
+ 
+         cur = build_attn(inp,
+                 nullptr, nullptr, nullptr,
+                 Qcur, Kcur, Vcur, kq_b, sinks, 1.0f/sqrtf(n_embd_head), il);
+ 
+-        cur = ggml_mul(ctx0, cur, ggml_sigmoid(ctx0, build_lora_mm(layer.wqkv_gate, inputs[0])));
++        if (layer_on_cpu && modchip_ink2::fusion_enabled(6) && cur->type == GGML_TYPE_F32 && attn_gate->type == GGML_TYPE_F32) {
++            const int64_t nrows_g = cur->ne[1] * cur->ne[2] * cur->ne[3];
++            const int n_tasks_g   = modchip_ink2::choose_n_tasks(cur->ne[0] * nrows_g, nrows_g);
++            cur = ggml_map_custom2(ctx0, cur, attn_gate, modchip_ink2::fused_mul_sigmoid_op, n_tasks_g, nullptr);
++        } else {
++            cur = ggml_mul(ctx0, cur, ggml_sigmoid(ctx0, attn_gate));
++        }
+         cur = convolve(build_lora_mm(layer.wo, cur), layer.attn_post_conv, nullptr, state, history, recr, 2*n_embd_k_gqa);
+         cb(cur, "attn_out", il);
+     }
+@@ -391,7 +544,7 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
+     if (messages) {
+         cur = control(cur, message(LOOP_CTRL_FFN), *loop, LOOP_CTRL_FFN);
+     }
+-    cur = build_norm(cur, layer.ffn_norm, nullptr, LLM_NORM_RMS, il);
++    cur = norm_rms(cur, layer.ffn_norm, il);
+ 
+     cur = build_moe_ffn(cur,
+             layer.ffn_gate_inp,
+@@ -421,8 +574,9 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
+ }
+ 
+ void llama_model_inkling2::graph::build_output(ggml_tensor * cur, const std::vector<ggml_tensor *> & blocks) {
++    layer_on_cpu = modchip_ink2::tensor_on_cpu(model.output);
+     cur = ggml_reshape_2d(ctx0, mix(blocks, cur, model.output_res_query), n_embd, n_tokens);
+-    cur = build_norm(cur, model.output_norm, nullptr, LLM_NORM_RMS, -1);
++    cur = norm_rms(cur, model.output_norm, -1);
+ 
+     if (inp_out_ids) {
+         cur = ggml_get_rows(ctx0, cur, inp_out_ids);
+@@ -435,14 +589,25 @@ void llama_model_inkling2::graph::build_output(ggml_tensor * cur, const std::vec
+     cur = build_lora_mm(model.output, cur);
+     ggml_prec_set_acc(cur, GGML_PREC_F32);
+ 
+-    if (hparams.f_final_logit_softcapping != 0.0f) {
+-        const float cap = hparams.f_final_logit_softcapping;
++    if (layer_on_cpu && modchip_ink2::fusion_enabled(7) && cur->type == GGML_TYPE_F32) {
++        ggml_tensor * out_args[1] = { cur };
++        cur = ggml_custom_4d(
++                ctx0, GGML_TYPE_F32,
++                hparams.n_vocab_unpadded, cur->ne[1], 1, 1,
++                out_args, 1,
++                modchip_ink2::fused_softcap_unpad_op,
++                GGML_N_TASKS_MAX,
++                modchip_ink2::intern_float_param(hparams.f_final_logit_softcapping));
++    } else {
++        if (hparams.f_final_logit_softcapping != 0.0f) {
++            const float cap = hparams.f_final_logit_softcapping;
+ 
+-        cur = ggml_scale(ctx0, ggml_tanh(ctx0, ggml_scale(ctx0, cur, 1.0f/cap)), cap);
+-    }
++            cur = ggml_scale(ctx0, ggml_tanh(ctx0, ggml_scale(ctx0, cur, 1.0f/cap)), cap);
++        }
+ 
+-    // drop the padded vocabulary
+-    cur = ggml_cont(ctx0, ggml_view_2d(ctx0, cur, hparams.n_vocab_unpadded, cur->ne[1], cur->nb[1], 0));
++        // drop the padded vocabulary
++        cur = ggml_cont(ctx0, ggml_view_2d(ctx0, cur, hparams.n_vocab_unpadded, cur->ne[1], cur->nb[1], 0));
++    }
+ 
+     cb(cur, "result_output", -1);
+     res->t_logits = cur;
+diff --git a/src/models/models.h b/src/models/models.h
+index 636afea..1cf3fd3 100644
+--- a/src/models/models.h
++++ b/src/models/models.h
+@@ -2508,7 +2508,7 @@ struct llama_model_inkling2 : public llama_model_base {
+     struct graph : public llm_graph_context {
+         graph(const llm_graph_params & params);
+         ggml_tensor * mix(const std::vector<ggml_tensor *> & blocks, ggml_tensor * cur, ggml_tensor * query);
+-        ggml_tensor * clip(ggml_tensor * cur, ggml_tensor * scale, float threshold);
++        ggml_tensor * clip(ggml_tensor * cur, ggml_tensor * scale, float threshold, ggml_tensor * tau_mul = nullptr);
+         ggml_tensor * convolve(
+                 ggml_tensor * cur,
+                 ggml_tensor * weight,
+@@ -2537,6 +2537,11 @@ struct llama_model_inkling2 : public llama_model_base {
+ 
+         ggml_tensor * inp_out_ids = nullptr;
+         ggml_tensor * tau         = nullptr; // log-scaled positions
++        ggml_tensor * zero_sinks  = nullptr;
++        int64_t       zero_sinks_n_head = 0;
++        bool          layer_on_cpu = true;
++
++        ggml_tensor * norm_rms(ggml_tensor * cur, ggml_tensor * weight, int il);
+     };
+ 
+     std::unique_ptr<llm_graph_context> build_arch_graph(const llm_graph_params & params) const override;
 diff --git a/src/models/nemotron-h-moe.cpp b/src/models/nemotron-h-moe.cpp
 index 4753558..b73ebd9 100644
 --- a/src/models/nemotron-h-moe.cpp
