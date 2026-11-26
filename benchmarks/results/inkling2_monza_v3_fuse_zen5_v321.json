@@ -4,57 +4,144 @@
   "model_sha256": "5f1df36927b56d761ede5359c1212d8443cee8330269062c0a0a3c96ed616038",
   "model_bytes": 15398405888,
   "binary": "llama-bench-modchip-linux-x86_64-avx512",
-  "binary_sha256": "d73d470c42c1269791f8b9cf57311760d32f683a68901735f343cf2e7b097e97",
-  "build_commit": "46eb174",
+  "binary_sha256": "4b923d9a4d7ad804154a890d101255985096abd1c360b7fe430239c068a09588",
+  "build_commit": "46eb1742d",
   "build_number": 12604,
   "cpu_info": "AMD Ryzen 9 9955HX 16-Core Processor",
   "backends": "CPU",
   "command_flags": "-p 512 -n 128 -r 3 -t 16 -ngl 0 -fa 1",
-  "measured_utc": "2026-11-26T10:07:06Z",
+  "measured_utc": "2026-11-26T19:15:22Z",
+  "notes": "Same-binary A/B on published portable v3.2.1 AVX-512 binary (GLIBC <= 2.30, GCC 10.5.0). Unfused rows disable Inkling-2 graph fusion and 16x8 VNNI panel GEMM (MODCHIP_GEMM_TILE=0) while retaining the 1xK IQ4_NL VNNI dot kernel (pre-1xK upstream baseline on the same host was 71.55 pp512 / 10.50 tg128).",
   "configs": {
     "unfused_nta_off": {
       "env": {
         "MODCHIP_INK2_FUSE": "0",
-        "LLAMA_NT_STREAM_MM": "0"
+        "LLAMA_NT_STREAM_MM": "0",
+        "MODCHIP_GEMM_TILE": "0"
       },
-      "pp512_tok_per_s": 71.55,
-      "pp512_stddev": 2.06,
-      "pp512_samples": [70.0491, 70.7168, 73.8962],
-      "tg128_tok_per_s": 10.50,
-      "tg128_stddev": 0.09,
-      "tg128_samples": [10.5181, 10.5771, 10.4035]
+      "pp512_tok_per_s": 92.98,
+      "pp512_stddev": 0.79,
+      "pp512_samples": [92.5433, 93.8865, 92.5062],
+      "tg128_tok_per_s": 10.40,
+      "tg128_stddev": 0.13,
+      "tg128_samples": [10.3558, 10.5441, 10.2934]
     },
     "unfused_nta_on": {
       "env": {
         "MODCHIP_INK2_FUSE": "0",
-        "LLAMA_NT_STREAM_MM": "1"
+        "LLAMA_NT_STREAM_MM": "1",
+        "MODCHIP_GEMM_TILE": "0"
       },
-      "pp512_tok_per_s": 71.04,
-      "pp512_stddev": 0.88,
-      "pp512_samples": [70.3038, 72.0066, 70.7975],
-      "tg128_tok_per_s": 10.57,
+      "pp512_tok_per_s": 92.19,
+      "pp512_stddev": 1.94,
+      "pp512_samples": [89.9504, 93.4468, 93.1726],
+      "tg128_tok_per_s": 10.65,
       "tg128_stddev": 0.03,
-      "tg128_samples": [10.5873, 10.5736, 10.5347]
+      "tg128_samples": [10.6486, 10.6755, 10.6199]
     },
     "fused_nta_on": {
       "env": {
         "MODCHIP_INK2_FUSE": "1",
-        "LLAMA_NT_STREAM_MM": "1"
+        "LLAMA_NT_STREAM_MM": "1",
+        "MODCHIP_GEMM_TILE": "1"
       },
-      "pp512_tok_per_s": 92.22,
-      "pp512_stddev": 0.14,
-      "pp512_samples": [92.2294, 92.3504, 92.0742],
-      "tg128_tok_per_s": 12.65,
-      "tg128_stddev": 0.03,
-      "tg128_samples": [12.6138, 12.6636, 12.6779],
+      "pp512_tok_per_s": 227.43,
+      "pp512_stddev": 1.08,
+      "pp512_samples": [228.321, 227.734, 226.222],
+      "tg128_tok_per_s": 13.29,
+      "tg128_stddev": 0.002,
+      "tg128_samples": [13.2843, 13.2847, 13.2877],
       "speedup_vs_unfused_nta_off_pct": {
-        "pp512": 28.9,
-        "tg128": 20.5
+        "pp512": 144.6,
+        "tg128": 27.8
       },
       "speedup_vs_unfused_nta_on_pct": {
-        "pp512": 29.8,
-        "tg128": 19.7
+        "pp512": 146.7,
+        "tg128": 24.8
       }
+    },
+    "fused_pin_mmap_t16": {
+      "env": {
+        "MODCHIP_INK2_FUSE": "1",
+        "LLAMA_NT_STREAM_MM": "1",
+        "MODCHIP_GEMM_TILE": "1",
+        "MODCHIP_PIN_CORES": "1"
+      },
+      "pp512_tok_per_s": 225.35,
+      "pp512_stddev": 1.74,
+      "pp512_samples": [226.722, 225.929, 223.391],
+      "tg128_tok_per_s": 13.17,
+      "tg128_stddev": 0.05,
+      "tg128_samples": [13.1213, 13.1831, 13.2129]
+    },
+    "fused_pin_none_t16": {
+      "env": {
+        "MODCHIP_INK2_FUSE": "1",
+        "LLAMA_NT_STREAM_MM": "1",
+        "MODCHIP_GEMM_TILE": "1",
+        "MODCHIP_PIN_CORES": "1"
+      },
+      "extra_flags": "-lm none",
+      "pp512_tok_per_s": 227.06,
+      "pp512_stddev": 1.40,
+      "pp512_samples": [228.383, 227.201, 225.589],
+      "tg128_tok_per_s": 13.26,
+      "tg128_stddev": 0.04,
+      "tg128_samples": [13.2711, 13.2847, 13.2119]
+    },
+    "fused_pin_mmap_t8": {
+      "env": {
+        "MODCHIP_INK2_FUSE": "1",
+        "LLAMA_NT_STREAM_MM": "1",
+        "MODCHIP_GEMM_TILE": "1",
+        "MODCHIP_PIN_CORES": "1"
+      },
+      "extra_flags": "-t 8",
+      "tg128_tok_per_s": 13.80,
+      "tg128_stddev": 0.07,
+      "tg128_samples": [13.8433, 13.831, 13.722],
+      "speedup_vs_unfused_nta_off_pct": {
+        "tg128": 32.7
+      }
+    },
+    "fused_pin_none_t8": {
+      "env": {
+        "MODCHIP_INK2_FUSE": "1",
+        "LLAMA_NT_STREAM_MM": "1",
+        "MODCHIP_GEMM_TILE": "1",
+        "MODCHIP_PIN_CORES": "1"
+      },
+      "extra_flags": "-t 8 -lm none",
+      "tg128_tok_per_s": 13.87,
+      "tg128_stddev": 0.07,
+      "tg128_samples": [13.9077, 13.9093, 13.784],
+      "speedup_vs_unfused_nta_off_pct": {
+        "tg128": 33.4
+      }
+    },
+    "fused_pin_none_t16_d8192": {
+      "env": {
+        "MODCHIP_INK2_FUSE": "1",
+        "LLAMA_NT_STREAM_MM": "1",
+        "MODCHIP_GEMM_TILE": "1",
+        "MODCHIP_PIN_CORES": "1"
+      },
+      "extra_flags": "-p 0 -n 32 -d 8192 -t 16 -lm none",
+      "tg32_d8192_tok_per_s": 10.57,
+      "tg32_d8192_stddev": 0.10,
+      "tg32_d8192_samples": [10.535, 10.4906, 10.6734]
+    },
+    "fused_pin_none_t8_d8192": {
+      "env": {
+        "MODCHIP_INK2_FUSE": "1",
+        "LLAMA_NT_STREAM_MM": "1",
+        "MODCHIP_GEMM_TILE": "1",
+        "MODCHIP_PIN_CORES": "1"
+      },
+      "extra_flags": "-p 0 -n 32 -d 8192 -t 8 -lm none",
+      "tg32_d8192_tok_per_s": 9.92,
+      "tg32_d8192_stddev": 0.02,
+      "tg32_d8192_samples": [9.93381, 9.93494, 9.89135]
     }
   }
 }

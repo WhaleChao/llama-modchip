@@ -3,17 +3,32 @@
   "release_version": "3.2.1",
   "release_tag": "v3.2.1",
   "patch_file": "patches/llama-modchip-v3.2.patch",
-  "patch_sha256": "3cf7b16f8b38ee3dacab0626f7acba48019c574e9b680eeca58e3976a592b9f9",
+  "patch_sha256": "23b45516877cb0e7acb87e6b9c1586e5d5b7e0b1e4b103ffa558c3fd36fa02c8",
   "upstream_llama_cpp": {
     "commit": "46eb1742d",
     "build_number": 12604
   },
   "abi_enums": {
-    "41": { "c_name": "GGML_TYPE_Q1_0", "py_name": "q1_0" },
-    "42": { "c_name": "GGML_TYPE_Q2_0", "py_name": "q2_0" },
-    "43": { "c_name": "GGML_TYPE_F8_E4M3", "py_name": "f8_e4m3" },
-    "44": { "c_name": "GGML_TYPE_FRACTAL_64", "py_name": "fractal_64" },
-    "45": { "c_name": "GGML_TYPE_VQ3_64", "py_name": "vq3_64" }
+    "41": {
+      "c_name": "GGML_TYPE_Q1_0",
+      "py_name": "q1_0"
+    },
+    "42": {
+      "c_name": "GGML_TYPE_Q2_0",
+      "py_name": "q2_0"
+    },
+    "43": {
+      "c_name": "GGML_TYPE_F8_E4M3",
+      "py_name": "f8_e4m3"
+    },
+    "44": {
+      "c_name": "GGML_TYPE_FRACTAL_64",
+      "py_name": "fractal_64"
+    },
+    "45": {
+      "c_name": "GGML_TYPE_VQ3_64",
+      "py_name": "vq3_64"
+    }
   },
   "rc_synced_headers": [
     "rc_arbiter_l1.h",
@@ -41,21 +56,21 @@
     "hf_binary_fallback_base": "https://huggingface.co/Synchopate/Qwen3.8-Flash-Next-MaxQ-64GB-GGUF/resolve/main"
   },
   "artifacts": {
-    "llama-server-modchip-linux-x86_64-avx512": "19361094462e0338506d3b2a52d55c36055e85b24bc39073fcc2546a94d3311f",
-    "llama-server-modchip-linux-x86_64-avx2": "8216b257491e133977565fb6f65abbe14dd29691b905c415ddfac3cfb5f04ba9",
-    "llama-server-modchip-linux-x86_64": "8216b257491e133977565fb6f65abbe14dd29691b905c415ddfac3cfb5f04ba9",
-    "llama-cli-modchip-linux-x86_64-avx512": "46ef789e882af455d117b1b5f26f0bec34922412b84fe30fa50d52bf455a7ff3",
-    "llama-cli-modchip-linux-x86_64-avx2": "96f41af9a927d6dd5a941bf71f593261c54dda486730681555f025afcb6855f2",
-    "llama-cli-modchip-linux-x86_64": "96f41af9a927d6dd5a941bf71f593261c54dda486730681555f025afcb6855f2",
-    "llama-bench-modchip-linux-x86_64-avx512": "d73d470c42c1269791f8b9cf57311760d32f683a68901735f343cf2e7b097e97",
-    "llama-bench-modchip-linux-x86_64-avx2": "ef973704b947994449bce914910b25ac921452eda85c37a0acd7b05a0b58fea4",
-    "llama-perplexity-modchip-linux-x86_64-avx512": "a8ba309b7682ead18fda1b742a67f8a92653830c37c1ca4cf1e35be9050128b1",
-    "llama-perplexity-modchip-linux-x86_64-avx2": "558819b5e349c887de8d4223919bbca0f97a2113779a0e826da8c19d8f618f5f",
-    "llama-quantize-modchip-linux-x86_64-avx512": "c38db2b6da2ca810680d6f9dc38b488e4ef06c379d1c98dc93a4195f8d91015e",
-    "llama-quantize-modchip-linux-x86_64-avx2": "3a4a4fbbca25cd7540daaf9da9a4206b5667aaf31ad07fe05246f9172192aed1"
+    "llama-server-modchip-linux-x86_64-avx512": "6cc390594f9906b18866eb0d3af534fcb2d3fa486d8b7193aa93597c703886c7",
+    "llama-server-modchip-linux-x86_64-avx2": "d4416540f0e7fa50c42048e2ff072b37d85593c3e4bb54cf534a8024f330905b",
+    "llama-server-modchip-linux-x86_64": "d4416540f0e7fa50c42048e2ff072b37d85593c3e4bb54cf534a8024f330905b",
+    "llama-cli-modchip-linux-x86_64-avx512": "011ff32668f891fd14334cfdd47bf574592c062a4f6ec6ce05ac49d9af255cea",
+    "llama-cli-modchip-linux-x86_64-avx2": "85838adb22a95c4f8e645a37b8567889e4cb9c4744c2ebbb2cfd686c66e6f249",
+    "llama-cli-modchip-linux-x86_64": "85838adb22a95c4f8e645a37b8567889e4cb9c4744c2ebbb2cfd686c66e6f249",
+    "llama-bench-modchip-linux-x86_64-avx512": "4b923d9a4d7ad804154a890d101255985096abd1c360b7fe430239c068a09588",
+    "llama-bench-modchip-linux-x86_64-avx2": "e0cc573b2cd9cf333d1105edf21b926994cd18d3a60f7985cde0a45df8c5df7f",
+    "llama-perplexity-modchip-linux-x86_64-avx512": "e9b676c7d8012b3831dfef43cf883e94a2788d5ffdd8606f87c09b12fb677f41",
+    "llama-perplexity-modchip-linux-x86_64-avx2": "397f95e83ced02d864804e4993c666a45ccc640b35c5b99c44ed4dd758ee85aa",
+    "llama-quantize-modchip-linux-x86_64-avx512": "69fc09f1948c0057c9cc86ff3fd74e80cf9876fe8b19d6f97113e7957ce65573",
+    "llama-quantize-modchip-linux-x86_64-avx2": "46836e4fd1cb54ab581f6429be77735695dc63dfe15a16d65f4f276a19f767ec"
   },
   "github_only_artifacts": {
-    "llama-modchip-v3.2.1-linux-x86_64.tar.gz": "fc5404aef608a3d9f01f8b04489eb0a537ae44777e63947b818f31cbe543a986"
+    "llama-modchip-v3.2.1-linux-x86_64.tar.gz": "9403629e54b9134cb3f9784ba77a47b8bb5da81565e8e236e8836e2892477022"
   },
   "benchmarks": [
     {
@@ -82,7 +97,7 @@
         "docs/DEEPSEEK_V4_OPTIMIZATIONS.md"
       ],
       "key_metrics": {
-        "configs.config1_pure_n1.aggregate_tok_per_s": 6.80,
+        "configs.config1_pure_n1.aggregate_tok_per_s": 6.8,
         "configs.config2_v30_ngram_map.aggregate_tok_per_s": 7.73,
         "configs.config3_routecrack2.aggregate_tok_per_s": 7.79
       }
@@ -96,9 +111,9 @@
         "paper/main.tex"
       ],
       "key_metrics": {
-        "configs.config1_pure_n1.aggregate_tok_per_s": 22.60,
+        "configs.config1_pure_n1.aggregate_tok_per_s": 22.6,
         "configs.config2_v30_ngram_map.aggregate_tok_per_s": 27.13,
-        "configs.config3_routecrack2.aggregate_tok_per_s": 28.20
+        "configs.config3_routecrack2.aggregate_tok_per_s": 28.2
       }
     },
     {
@@ -111,10 +126,10 @@
         "paper/main.tex"
       ],
       "key_metrics": {
-        "configs.unfused_nta_off.pp512_tok_per_s": 71.55,
-        "configs.unfused_nta_off.tg128_tok_per_s": 10.50,
-        "configs.fused_nta_on.pp512_tok_per_s": 92.22,
-        "configs.fused_nta_on.tg128_tok_per_s": 12.65
+        "configs.unfused_nta_off.pp512_tok_per_s": 92.98,
+        "configs.unfused_nta_off.tg128_tok_per_s": 10.4,
+        "configs.fused_nta_on.pp512_tok_per_s": 227.43,
+        "configs.fused_nta_on.tg128_tok_per_s": 13.29
       }
     }
   ]

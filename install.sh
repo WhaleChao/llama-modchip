@@ -666,8 +666,8 @@ PREBUILT_OK=0
 if [[ "$USE_PREBUILT" == "1" && -n "$X86_PREBUILT_ASSET" ]]; then
     ASSET_URL="https://github.com/synchopate/llama-modchip/releases/download/v3.2.1/${X86_PREBUILT_ASSET}"
     FALLBACK_ASSET_URL="https://huggingface.co/Synchopate/Qwen3.8-Flash-Next-MaxQ-64GB-GGUF/resolve/main/${X86_PREBUILT_ASSET}"
-    EXPECTED_BIN_SHA256="8216b257491e133977565fb6f65abbe14dd29691b905c415ddfac3cfb5f04ba9"
-    [[ "$X86_PREBUILT_ASSET" == *-avx512 ]] && EXPECTED_BIN_SHA256="19361094462e0338506d3b2a52d55c36055e85b24bc39073fcc2546a94d3311f"
+    EXPECTED_BIN_SHA256="d4416540f0e7fa50c42048e2ff072b37d85593c3e4bb54cf534a8024f330905b"
+    [[ "$X86_PREBUILT_ASSET" == *-avx512 ]] && EXPECTED_BIN_SHA256="6cc390594f9906b18866eb0d3af534fcb2d3fa486d8b7193aa93597c703886c7"
     echo "[*] CPUID selected portable v3.2.1 precompiled binary: ${X86_PREBUILT_ASSET}"
     if curl -fL --progress-bar -o "${WORKSPACE_DIR}/bin/llama-server-nemotron.part" "$ASSET_URL" \
         || curl -fL --progress-bar -o "${WORKSPACE_DIR}/bin/llama-server-nemotron.part" "$FALLBACK_ASSET_URL"; then
