@@ -1,0 +1,60 @@
+{
+  "model_label": "Inkling-2-Mini-Monza-RS-v3",
+  "model_path": "Inkling-2-Mini-Monza-RS-v3-Ultimate.gguf",
+  "model_sha256": "5f1df36927b56d761ede5359c1212d8443cee8330269062c0a0a3c96ed616038",
+  "model_bytes": 15398405888,
+  "binary": "llama-bench-modchip-linux-x86_64-avx512",
+  "binary_sha256": "d73d470c42c1269791f8b9cf57311760d32f683a68901735f343cf2e7b097e97",
+  "build_commit": "46eb174",
+  "build_number": 12604,
+  "cpu_info": "AMD Ryzen 9 9955HX 16-Core Processor",
+  "backends": "CPU",
+  "command_flags": "-p 512 -n 128 -r 3 -t 16 -ngl 0 -fa 1",
+  "measured_utc": "2026-11-26T10:07:06Z",
+  "configs": {
+    "unfused_nta_off": {
+      "env": {
+        "MODCHIP_INK2_FUSE": "0",
+        "LLAMA_NT_STREAM_MM": "0"
+      },
+      "pp512_tok_per_s": 71.55,
+      "pp512_stddev": 2.06,
+      "pp512_samples": [70.0491, 70.7168, 73.8962],
+      "tg128_tok_per_s": 10.50,
+      "tg128_stddev": 0.09,
+      "tg128_samples": [10.5181, 10.5771, 10.4035]
+    },
+    "unfused_nta_on": {
+      "env": {
+        "MODCHIP_INK2_FUSE": "0",
+        "LLAMA_NT_STREAM_MM": "1"
+      },
+      "pp512_tok_per_s": 71.04,
+      "pp512_stddev": 0.88,
+      "pp512_samples": [70.3038, 72.0066, 70.7975],
+      "tg128_tok_per_s": 10.57,
+      "tg128_stddev": 0.03,
+      "tg128_samples": [10.5873, 10.5736, 10.5347]
+    },
+    "fused_nta_on": {
+      "env": {
+        "MODCHIP_INK2_FUSE": "1",
+        "LLAMA_NT_STREAM_MM": "1"
+      },
+      "pp512_tok_per_s": 92.22,
+      "pp512_stddev": 0.14,
+      "pp512_samples": [92.2294, 92.3504, 92.0742],
+      "tg128_tok_per_s": 12.65,
+      "tg128_stddev": 0.03,
+      "tg128_samples": [12.6138, 12.6636, 12.6779],
+      "speedup_vs_unfused_nta_off_pct": {
+        "pp512": 28.9,
+        "tg128": 20.5
+      },
+      "speedup_vs_unfused_nta_on_pct": {
+        "pp512": 29.8,
+        "tg128": 19.7
+      }
+    }
+  }
+}

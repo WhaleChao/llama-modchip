@@ -222,4 +222,14 @@ Applying the **single-token ($N=1$, GEMV) bandwidth formula** (`Throughput × Ac
 
 ---
 
+## Q17: How do I run `Inkling-2-Mini Monza-RS v3` on `llama-modchip v3.2.1`, and how do `MODCHIP_INK2_FUSE` and `LLAMA_NT_STREAM_MM` behave?
+
+1. **Running `Inkling-2-Mini Monza-RS v3` (`14.34 GiB`, Apache 2.0, 100% Standard GGUF)**:
+   - `Inkling-2-Mini-Monza-RS-v3-Ultimate.gguf` (`SHA-256 = 5f1df369...`) uses strictly standard upstream `llama.cpp b12604+` tensor types (`F32`, `Q8_0`, `IQ4_NL`, `MXFP4`). Launch it directly with `--model` (or `./modchip start /path/to/Inkling-2-Mini-Monza-RS-v3-Ultimate.gguf`) — `install.sh` automatically selects `-ctk f16 -ctv f16` whenever `MODEL_ARCH == inkling2*`, and sets `RC_TABLES_DIR=/nonexistent` for vocabulary isolation.
+2. **Default-ON Fusion & Non-Temporal Streaming (`MODCHIP_INK2_FUSE=1`, `LLAMA_NT_STREAM_MM=1`)**:
+   - Both bounded-error (`< 1 ULP`) AVX-512 graph fusion (`MODCHIP_INK2_FUSE_MASK=0x2FF` covering bits 0..7 + sigmoid MoE router bit 9; standalone `norm_rms` bit 8 is opt-in via `0x3FF`) and non-temporal decode streaming (`LLAMA_NT_STREAM_MM=1` for `>= 4 MiB` matrices at `nr1 <= 4`) are **ON by default** in `llama-modchip v3.2.1`, with automatic CPU-device gating (`modchip_ink2::tensor_on_cpu`) so Metal/CUDA/Vulkan offloaded layers suffer zero sync stalls.
+   - To reproduce the published Zen 5 AVX-512 A/B benchmark (`llama-bench-modchip-linux-x86_64-avx512`, `Ryzen 9 9955HX`, `-p 512 -n 128 -r 3 -t 16 -ngl 0 -fa 1` in [`benchmarks/results/inkling2_monza_v3_fuse_zen5_v321.json`](benchmarks/results/inkling2_monza_v3_fuse_zen5_v321.json)), compare `MODCHIP_INK2_FUSE=0 LLAMA_NT_STREAM_MM=0` (`71.55 pp512 / 10.50 tg128 tok/s`), `MODCHIP_INK2_FUSE=0 LLAMA_NT_STREAM_MM=1` (`71.04 / 10.57 tok/s`), and default `MODCHIP_INK2_FUSE=1 LLAMA_NT_STREAM_MM=1` (**`92.22 pp512` [`+28.9%` combined, `+29.8%` pure fusion] / `12.65 tg128` [`+20.5%` combined, `+19.7%` pure fusion]**).
+
+---
+
 *Navigation: [Back to Overview & Quickstart (`README.md`)](README.md) · [Technical Paper (`ARCHITECTURE.md`)](ARCHITECTURE.md) · [`RouteCrack + Stockfish-PVS` Techniques (`speculative/ROUTECRACK_TECHNIQUES.md`)](speculative/ROUTECRACK_TECHNIQUES.md) · [Release Notes (`RELEASE_NOTES.md`)](RELEASE_NOTES.md)*

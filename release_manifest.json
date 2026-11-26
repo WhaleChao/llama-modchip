@@ -100,6 +100,22 @@
         "configs.config2_v30_ngram_map.aggregate_tok_per_s": 27.13,
         "configs.config3_routecrack2.aggregate_tok_per_s": 28.20
       }
+    },
+    {
+      "json": "benchmarks/results/inkling2_monza_v3_fuse_zen5_v321.json",
+      "docs": [
+        "README.md",
+        "RELEASE_NOTES.md",
+        "ARCHITECTURE.md",
+        "FAQ.md",
+        "paper/main.tex"
+      ],
+      "key_metrics": {
+        "configs.unfused_nta_off.pp512_tok_per_s": 71.55,
+        "configs.unfused_nta_off.tg128_tok_per_s": 10.50,
+        "configs.fused_nta_on.pp512_tok_per_s": 92.22,
+        "configs.fused_nta_on.tg128_tok_per_s": 12.65
+      }
     }
   ]
 }
