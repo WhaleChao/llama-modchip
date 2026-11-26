@@ -666,8 +666,8 @@ PREBUILT_OK=0
 if [[ "$USE_PREBUILT" == "1" && -n "$X86_PREBUILT_ASSET" ]]; then
     ASSET_URL="https://github.com/synchopate/llama-modchip/releases/download/v3.2.1/${X86_PREBUILT_ASSET}"
     FALLBACK_ASSET_URL="https://huggingface.co/Synchopate/Qwen3.8-Flash-Next-MaxQ-64GB-GGUF/resolve/main/${X86_PREBUILT_ASSET}"
-    EXPECTED_BIN_SHA256="94e349d7cd70fcc7812ee02d7a323afff141e2ee604cb7c2f79c18ddf6136493"
-    [[ "$X86_PREBUILT_ASSET" == *-avx512 ]] && EXPECTED_BIN_SHA256="72f88dccd6f8b067e8bddf0a8beb246d7e955c0a87da5e6d997f74089695c6a7"
+    EXPECTED_BIN_SHA256="8216b257491e133977565fb6f65abbe14dd29691b905c415ddfac3cfb5f04ba9"
+    [[ "$X86_PREBUILT_ASSET" == *-avx512 ]] && EXPECTED_BIN_SHA256="19361094462e0338506d3b2a52d55c36055e85b24bc39073fcc2546a94d3311f"
     echo "[*] CPUID selected portable v3.2.1 precompiled binary: ${X86_PREBUILT_ASSET}"
     if curl -fL --progress-bar -o "${WORKSPACE_DIR}/bin/llama-server-nemotron.part" "$ASSET_URL" \
         || curl -fL --progress-bar -o "${WORKSPACE_DIR}/bin/llama-server-nemotron.part" "$FALLBACK_ASSET_URL"; then
@@ -1015,6 +1015,7 @@ if [[ -z "\${DECODE_THREADS:-}" ]]; then
 fi
 BATCH_THREADS="\${BATCH_THREADS:-\${DECODE_THREADS}}"
 
+CACHE_K_TYPE="q8_0"
 CACHE_V_TYPE="q4_0"
 FLASH_ATTN_MODE="auto"
 EFFECTIVE_CTX_SIZE="\${MODCHIP_CTX_SIZE:-${CTX_SIZE}}"
@@ -1080,6 +1081,14 @@ elif [[ "\${MODEL_ARCH:-}" == "deepseek4" ]]; then
             echo "[i] 64GB OS Headroom Guard: using -c \${EFFECTIVE_CTX_SIZE} -ub \${UBATCH_SIZE} and disk slot cache"
             echo "    so desktop/OS processes retain >=3.4–4.0 GiB free RAM. (Set MODCHIP_CTX_SIZE=262144 on a dedicated headless node.)"
         fi
+    fi
+elif [[ "\${MODEL_ARCH:-}" == inkling2* ]]; then
+    CACHE_K_TYPE="f16"
+    CACHE_V_TYPE="f16"
+    if [[ "${TOTAL_RAM_GB}" -le 18 ]]; then
+        [[ -z "\${MODCHIP_CTX_SIZE:-}" ]] && EFFECTIVE_CTX_SIZE=32768
+        [[ -z "\${MODCHIP_UBATCH_SIZE:-}" ]] && UBATCH_SIZE=512
+        [[ -z "\${MODCHIP_SLOT_SAVE_PATH:-}" ]] && SLOT_SAVE_DIR="${WORKSPACE_DIR}/cache"
     fi
 else
     if [[ "${TOTAL_RAM_GB}" -le 18 ]]; then
@@ -1151,7 +1160,7 @@ exec \${LAUNCH_PREFIX[@]+"\${LAUNCH_PREFIX[@]}"} "${WORKSPACE_DIR}/bin/llama-ser
   -tb "\${BATCH_THREADS}" \\
   --poll 0 \\
   --poll-batch 0 \\
-  --cache-type-k q8_0 \\
+  --cache-type-k "\${CACHE_K_TYPE}" \\
   --cache-type-v "\${CACHE_V_TYPE}" \\
   --flash-attn "\${FLASH_ATTN_MODE}" \\
   --load-mode "\${LOAD_MODE}" \\

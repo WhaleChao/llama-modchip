@@ -329,6 +329,10 @@ def inspect_gguf(path: str) -> GGUFModelInfo:
         kv_bytes_fp16 = 2 * (key_length + value_length) * total_kv_heads
         # Qwen3.8 GQA uses symmetric Q8_0/Q8_0 KV cache (~1.0625 B/elem)
         kv_bytes_q8q4 = int(round(1.0625 * (key_length + value_length) * total_kv_heads))
+    elif arch.startswith("inkling2"):
+        # Inkling-2 retains native F16 KV cache (avoid Q4_0 V-cache drift)
+        kv_bytes_fp16 = 2 * (key_length + value_length) * total_kv_heads
+        kv_bytes_q8q4 = kv_bytes_fp16
     else:
         # FP16: 2 bytes * (K_dim + V_dim) * total_kv_heads
         kv_bytes_fp16 = 2 * (key_length + value_length) * total_kv_heads
@@ -349,7 +353,8 @@ def inspect_gguf(path: str) -> GGUFModelInfo:
     # (e.g., src/models/qwen3moe.cpp:144, qwen35moe.cpp:514, qwen4exp.cpp, granite.cpp:277, kimi-linear.cpp:508, mellum.cpp:186)
     # even when the GGUF converter omits the {arch}.expert_weights_norm metadata key.
     LLAMACPP_HARDCODED_NORM_W_ARCHS = {
-        "qwen3moe", "qwen35moe", "qwen4exp", "granite", "granitemoe", "kimi-linear", "mellum", "deepseek2"
+        "qwen3moe", "qwen35moe", "qwen4exp", "inkling2", "inkling2_loop",
+        "granite", "granitemoe", "kimi-linear", "mellum", "deepseek2",
     }
     expert_weights_norm = bool(
         meta.get(f"{arch}.expert_weights_norm", arch in LLAMACPP_HARDCODED_NORM_W_ARCHS)
@@ -753,7 +758,11 @@ def _build_hacks_list(
                 else (
                     "Symmetric GQA KV Quantization (-ctk q8_0 -ctv q8_0)"
                     if model.arch == "qwen4exp"
-                    else "Asymmetric KV Quantization (-ctk q8_0 -ctv q4_0)"
+                    else (
+                        "Native FP16 KV Cache (-ctk f16 -ctv f16)"
+                        if model.arch.startswith("inkling2")
+                        else "Asymmetric KV Quantization (-ctk q8_0 -ctv q4_0)"
+                    )
                 )
             ),
             "BOOT", "SAFE", use_eakv,
@@ -763,7 +772,11 @@ def _build_hacks_list(
                 else (
                     f"BOOT ({model.kv_bytes_per_tok_fp16} B/tok FP16 -> {model.kv_bytes_per_tok_q8q4} B/tok Q8_0 GQA, -46.9%)"
                     if model.arch == "qwen4exp"
-                    else f"BOOT ({model.kv_bytes_per_tok_fp16} B/tok FP16 -> {model.kv_bytes_per_tok_q8q4} B/tok Q8/Q4, -62.5%)"
+                    else (
+                        f"BOOT ({model.kv_bytes_per_tok_fp16} B/tok F16)"
+                        if model.arch.startswith("inkling2")
+                        else f"BOOT ({model.kv_bytes_per_tok_fp16} B/tok FP16 -> {model.kv_bytes_per_tok_q8q4} B/tok Q8/Q4, -62.5%)"
+                    )
                 )
             ),
             (
@@ -772,7 +785,11 @@ def _build_hacks_list(
                 else (
                     "Applied at server startup: Qwen3.8 GQA full-attention uses symmetric Q8_0/Q8_0 KV cache."
                     if model.arch == "qwen4exp"
-                    else "Applied at server startup: Keys in Q8_0, Values in Q4_0."
+                    else (
+                        "Applied at server startup: Inkling-2 uses native F16 KV cache (avoiding Q4_0 V-cache drift)."
+                        if model.arch.startswith("inkling2")
+                        else "Applied at server startup: Keys in Q8_0, Values in Q4_0."
+                    )
                 )
             ),
         ),
@@ -1147,8 +1164,12 @@ def build_launch_command(
         f"-cb -ub {ubatch} -b 2048 --flash-attn {fa_mode} --load-mode {load_mode}",
     ])
     if prof.use_eakv:
-        ctv = "q8_0" if prof.model.arch in ("deepseek4", "qwen4exp") else "q4_0"
-        cmd_parts.append(f"--cache-type-k q8_0 --cache-type-v {ctv}")
+        if prof.model.arch.startswith("inkling2"):
+            ctk, ctv = "f16", "f16"
+        else:
+            ctk = "q8_0"
+            ctv = "q8_0" if prof.model.arch in ("deepseek4", "qwen4exp") else "q4_0"
+        cmd_parts.append(f"--cache-type-k {ctk} --cache-type-v {ctv}")
     if prof.use_repack:
         cmd_parts.append("--repack")
     cmd_parts.append(f"--cache-reuse 256 --slot-save-path {shlex.quote(slot_save_dir)}")
@@ -1188,7 +1209,7 @@ def print_profile_report(prof: ModchipProfile) -> None:
     m = prof.model
     hw = prof.hw
     print("┌" + "─" * 98 + "┐")
-    print(f"│ {'llama-modchip v3.2.0 — CPU GGUF Hardware & Topology Profiler':<96} │")
+    print(f"│ {'llama-modchip v3.2.1 — CPU GGUF Hardware & Topology Profiler':<96} │")
     print("├" + "─" * 98 + "┤")
     print(f"│ [HARDWARE] CPU: {hw.cpu_model[:44]:<44} | CCDs: {hw.num_ccds}x{hw.l3_per_ccd_mb:.0f}MB L3 | RAM: {hw.ram_total_gib:.0f} GiB │")
     print(f"│ [ISA/THP]  Flags: {', '.join(hw.isa_flags):<42} | THP: {hw.thp_mode:<10} | Cores: {len(hw.physical_core_cpus):<6} │")
@@ -1358,7 +1379,7 @@ def run_ab_benchmark(prof: ModchipProfile, bench_bin: Optional[str] = None) -> i
     native_top_k = m.expert_used_count if m.is_moe else 0
 
     print("\n" + "=" * 100)
-    print(f" RUNNING 1-COMMAND A/B BENCHMARK: Stock Baseline vs. llama-modchip v3.2.0 ({m.filename})")
+    print(f" RUNNING 1-COMMAND A/B BENCHMARK: Stock Baseline vs. llama-modchip v3.2.1 ({m.filename})")
     print("=" * 100)
 
     # 1. Baseline (Stock FP16 KV, Native Top-K, No SWA, No SHM override)
@@ -1401,18 +1422,22 @@ def run_ab_benchmark(prof: ModchipProfile, bench_bin: Optional[str] = None) -> i
     if prof.moe_top_k > 0 and m.arch != "deepseek4":
         mod_env["LLAMA_MOE_TOP_K"] = str(prof.moe_top_k)
 
-    ctv = "q8_0" if m.arch in ("deepseek4", "qwen4exp") else "q4_0"
+    if m.arch.startswith("inkling2"):
+        ctk, ctv = "f16", "f16"
+    else:
+        ctk = "q8_0"
+        ctv = "q8_0" if m.arch in ("deepseek4", "qwen4exp") else "q4_0"
     mod_cmd = pin_prefix + [
         resolved_bench,
         "-m", m.path,
         "-t", str(n_threads),
         "--poll", "0",
-        "-ctk", "q8_0", "-ctv", ctv,
+        "-ctk", ctk, "-ctv", ctv,
         "-p", "512", "-n", "64", "-r", "2",
     ]
     print(
         f"[*] Run B (llama-modchip — Top-K={prof.moe_top_k or native_top_k or 'Dense'}, "
-        f"SWA_STRIDE={prof.swa_stride}, L3_WIN={prof.l3_window}, Q8_0/{ctv.upper()} KV, -t {n_threads} --poll 0): running..."
+        f"SWA_STRIDE={prof.swa_stride}, L3_WIN={prof.l3_window}, {ctk.upper()}/{ctv.upper()} KV, -t {n_threads} --poll 0): running..."
     )
     res_b = subprocess.run(mod_cmd, env=mod_env, capture_output=True, text=True)
     pp_b, tg_b = _parse_llama_bench_output(res_b.stdout + "\n" + res_b.stderr)
@@ -1427,9 +1452,9 @@ def run_ab_benchmark(prof: ModchipProfile, bench_bin: Optional[str] = None) -> i
         print("| :--- | :---: | :---: | :--- |")
         print(f"| **Stock Baseline** | `{pp_a:.2f} tok/s` | `{tg_a:.2f} tok/s` | `Top-K={native_top_k or 'Dense'}`, `FP16 KV`, `No SWA` |")
         print(
-            f"| **`llama-modchip v3.2.0`** | **`{pp_b:.2f} tok/s` (`{pp_gain:+.1f}%`)** | "
+            f"| **`llama-modchip v3.2.1`** | **`{pp_b:.2f} tok/s` (`{pp_gain:+.1f}%`)** | "
             f"**`{tg_b:.2f} tok/s` (`{tg_gain:+.1f}%`)** | "
-            f"`Top-K={prof.moe_top_k or native_top_k or 'Dense'}`, `SWA_STRIDE={prof.swa_stride}`, `L3_WIN={prof.l3_window}`, `Q8_0/{ctv.upper()}` |"
+            f"`Top-K={prof.moe_top_k or native_top_k or 'Dense'}`, `SWA_STRIDE={prof.swa_stride}`, `L3_WIN={prof.l3_window}`, `{ctk.upper()}/{ctv.upper()}` |"
         )
         print()
     else:
@@ -1464,7 +1489,7 @@ def run_tui(prof: ModchipProfile, port: int = 8789) -> None:
             h, w = stdscr.getmaxyx()
             m = prof.model
             hw = prof.hw
-            stdscr.addstr(0, 0, f"=== llama-modchip v3.2.0 (Live SHM TUI) == Target: {m.filename} ==="[:w - 1], curses.A_BOLD)
+            stdscr.addstr(0, 0, f"=== llama-modchip v3.2.1 (Live SHM TUI) == Target: {m.filename} ==="[:w - 1], curses.A_BOLD)
             stdscr.addstr(1, 0, f"CPU: {hw.cpu_model} ({hw.num_ccds}x{hw.l3_per_ccd_mb:.0f}MB L3) | Arch: {m.arch_summary}"[:w - 1])
             stdscr.addstr(2, 0, "-" * min(w - 1, 96))
 

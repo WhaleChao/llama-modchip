@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # run-dsv4.sh — DeepSeek-V4-Flash-0731-MaxQ-v4 (284B, 57.99 GiB, 100% std ggml) on Apple Silicon Mac (64 GB).
 #
-# Build the engine first with ./build-dsv4-engine.sh (unified llama-modchip v3.2.0:
+# Build the engine first with ./build-dsv4-engine.sh (unified llama-modchip v3.2.1:
 # llama.cpp 46eb1742d + patches/llama-modchip-v3.2.patch). Required for ConeCollapse
 # ffn_down_exps.bias and RouteCrack 2.0 support.
 #

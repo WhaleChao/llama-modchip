@@ -1,5 +1,5 @@
 [Unit]
-Description=llama-modchip v3.1.0 Multi-Model & HARP-Cache SSE Gateway (Port 8787)
+Description=llama-modchip v3.2.1 Multi-Model & HARP-Cache SSE Gateway (Port 8787)
 After=network.target nemotron-256k.service
 Wants=nemotron-256k.service
 

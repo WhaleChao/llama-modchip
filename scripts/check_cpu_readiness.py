@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 check_cpu_readiness.py — Hardware Compatibility, OS Headroom & Performance Estimator
-for llama-modchip v3.2.0 3-Tier RAM Fleet:
+for llama-modchip v3.2.1 3-Tier RAM Fleet:
   - 64 GB Tier: Qwen3.8-Flash-Next-MaxQ-64GB (53.99 GiB) & DeepSeek-V4-Flash 284B MaxQ-v4 (57.99 GiB)
   - 32 GB Tier: Qwen3.8-Flash-Next-MaxQ-32GB (24.98 GiB Shard 1 + 10.73 GiB lazy NVMe PLE)
   - 16 GB Tier: NVIDIA-Nemotron-3.5-30B-A3B VQ3-64 (13.30 GiB) & MaxQ-16GB (13.39 GiB std ggml)
@@ -1163,7 +1163,7 @@ def evaluate_dsv4_284b_readiness(cpu, mem, rep_30b):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Check CPU readiness & RAM headroom for llama-modchip v3.2.0 (Qwen3.8 64GB/32GB, DeepSeek-V4 284B MaxQ-v4, Nemotron-30B 16GB)"
+        description="Check CPU readiness & RAM headroom for llama-modchip v3.2.1 (Qwen3.8 64GB/32GB, DeepSeek-V4 284B MaxQ-v4, Nemotron-30B 16GB)"
     )
     parser.add_argument(
         "--model",
@@ -1188,7 +1188,7 @@ def main():
 
     if not args.json:
         print("=" * 78)
-        print(" LLAMA-MODCHIP v3.2.0 — CPU, SIMD ISA & 16GB/32GB/64GB RAM READINESS AUDIT")
+        print(" LLAMA-MODCHIP v3.2.1 — CPU, SIMD ISA & 16GB/32GB/64GB RAM READINESS AUDIT")
         print("=" * 78)
         print(" Running multi-core DRAM streaming micro-benchmark (~0.6s)..." if not args.no_bench else "")
 

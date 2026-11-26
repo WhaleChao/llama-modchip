@@ -9,7 +9,7 @@
     [string]$SrcRoot = ""
 )
 
-# Builds the unified llama-modchip v3.1.0 engine on Windows (MinGW-w64 CPU or MSVC + CUDA).
+# Builds the unified llama-modchip v3.2.1 engine on Windows (MinGW-w64 CPU or MSVC + CUDA).
 # Supports Qwen3.8-Flash-Next, DeepSeek-V4-Flash, and Nemotron-3.5-30B with zero-collision custom types:
 #   - GGML_TYPE_Q2_0       = 42 (upstream 18 B/64 untouched)
 #   - GGML_TYPE_F8_E4M3    = 43 (upstream untouched)
@@ -32,7 +32,7 @@ $BuildDir   = if ($Cuda) { Join-Path $LlamaDir "build-cuda" } else { Join-Path $
 function Fail([string]$Msg) { Write-Host "[!] $Msg" -ForegroundColor Red; exit 1 }
 
 Write-Host "================================================================================" -ForegroundColor Cyan
-Write-Host "  llama-modchip v3.1.0 Unified Windows Engine Build (Qwen3.8 + DeepSeek-V4 + Nemotron)" -ForegroundColor Green
+Write-Host "  llama-modchip v3.2.1 Unified Windows Engine Build (Qwen3.8 + DeepSeek-V4 + Nemotron)" -ForegroundColor Green
 Write-Host ("  Target : {0} | Backend: {1}" -f $Target, $(if ($Cuda) { "CUDA sm_$Arch + CPU (MSVC)" } else { "CPU Native SIMD (MinGW-w64)" })) -ForegroundColor Green
 Write-Host "================================================================================" -ForegroundColor Cyan
 
@@ -119,19 +119,42 @@ cmake --build "$BuildDir" -j $jobs --target llama-server llama-cli llama-bench l
         $ninja = (Get-Command ninja.exe -ErrorAction SilentlyContinue).Source
         $gcc   = (Get-Command g++.exe   -ErrorAction SilentlyContinue).Source
         if (-not $cmake -or -not $ninja -or -not $gcc) { Fail "cmake.exe / ninja.exe / g++.exe not in PATH (install MinGW-w64 WinLibs + CMake + Ninja)." }
-        $winFlags = "-D_WIN32_WINNT=0x0A00 -DNTDDI_VERSION=0x0A000000"
+        $winCFlags   = "-D_WIN32_WINNT=0x0A00 -DNTDDI_VERSION=0x0A000000"
+        $winCxxFlags = $winCFlags
+        $mingwIsaArgs = @()
+        if ($DisableAvx512) {
+            Write-Host "[*] -DisableAvx512 requested -- disabling AVX-512 kernels (AVX2 fallback)." -ForegroundColor Yellow
+            $mingwIsaArgs = @(
+                "-DGGML_NATIVE=OFF",
+                "-DGGML_AVX512=OFF", "-DGGML_AVX512_VBMI=OFF", "-DGGML_AVX512_VNNI=OFF", "-DGGML_AVX512_BF16=OFF",
+                "-DGGML_AVX2=ON", "-DGGML_FMA=ON", "-DGGML_F16C=ON"
+            )
+            $winCFlags   += " -mno-avx512f"
+            $winCxxFlags += " -mno-avx512f -DMODCHIP_INK2_DISABLE_AVX512"
+        } elseif ($EnableAvx512) {
+            Write-Host "[*] -EnableAvx512 requested -- enabling AVX-512 + VBMI + VNNI + FMA kernels." -ForegroundColor Green
+            $mingwIsaArgs = @(
+                "-DGGML_NATIVE=OFF",
+                "-DGGML_AVX512=ON", "-DGGML_AVX512_VBMI=ON", "-DGGML_AVX512_VNNI=ON", "-DGGML_AVX512_BF16=OFF",
+                "-DGGML_AVX2=ON", "-DGGML_FMA=ON", "-DGGML_F16C=ON"
+            )
+            $winCFlags   += " -march=skylake-avx512 -mavx512vbmi -mavx512vnni"
+            $winCxxFlags += " -march=skylake-avx512 -mavx512vbmi -mavx512vnni"
+        } else {
+            $mingwIsaArgs = @("-DGGML_NATIVE=ON")
+        }
         Write-Host "[*] Configuring ..." -ForegroundColor Cyan
         & cmake -B $BuildDir -G Ninja `
             -DCMAKE_BUILD_TYPE=Release `
             -DLLAMA_BUILD_NUMBER=12604 `
-            -DGGML_NATIVE=ON `
+            @mingwIsaArgs `
             -DGGML_OPENMP=OFF `
             -DLLAMA_CURL=OFF `
             -DLLAMA_BUILD_TESTS=OFF `
             -DBUILD_SHARED_LIBS=OFF `
             "-DCMAKE_EXE_LINKER_FLAGS=-static -Wl,--stack,16777216" `
-            "-DCMAKE_C_FLAGS=$winFlags" `
-            "-DCMAKE_CXX_FLAGS=$winFlags"
+            "-DCMAKE_C_FLAGS=$winCFlags" `
+            "-DCMAKE_CXX_FLAGS=$winCxxFlags"
         if ($LASTEXITCODE -ne 0) { Fail "cmake configure failed." }
         Write-Host "[*] Building (a few minutes) ..." -ForegroundColor Cyan
         & cmake --build $BuildDir -j $jobs --target llama-server llama-cli llama-bench llama-perplexity llama-quantize

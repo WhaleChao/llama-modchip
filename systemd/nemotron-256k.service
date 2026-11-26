@@ -47,7 +47,7 @@ Environment="LLAMA_KV_L3_WINDOW=2048" "LLAMA_ATTN_WINDOW=0" "LLAMA_ATTN_SINKS=16
 # Threading: use non-convoy physical_cores - 1 (e.g., -t 15 -tb 15 on 16-core Zen 5) with --poll 0 --poll-batch 0
 # so OS / HTTP threads never preempt OpenMP barrier workers.
 #
-# Drop-in examples for other v3.2.0 model families (override ExecStart + Environment via `systemctl edit`):
+# Drop-in examples for other v3.2.1 model families (override ExecStart + Environment via `systemctl edit`):
 # - Qwen3.8-Flash-Next MaxQ-64GB / 32GB (set RC_TABLES_DIR=/nonexistent):
 #     --model /var/lib/llama-modchip/models/Qwen3.8-Flash-Next-MaxQ-64GB-00001-of-00002.gguf \
 #     -c 32768 -t 15 -tb 15 --poll 0 --poll-batch 0 --load-mode mmap --flash-attn on \

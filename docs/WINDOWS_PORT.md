@@ -1,15 +1,15 @@
-# llama-modchip on Windows — Porting Notes & Benchmarks (`v3.2.0`)
+# llama-modchip on Windows — Porting Notes & Benchmarks (`v3.2.1`)
 
-**Project:** `llama-modchip` `v3.2.0` (`Qwen3.8-Flash-Next-MaxQ-64GB` `53.99 GiB` & `MaxQ-32GB` `35.71 GiB`, `DeepSeek-V4-Flash-0731-MaxQ-v4` `57.99 GiB`, and `NVIDIA-Nemotron-3.5-30B-A3B` `VQ3-64` `13.30 GiB` / `MaxQ-16GB` `13.39 GiB` / `Abliterated-VQ3-64` `13.30 GiB`)
+**Project:** `llama-modchip` `v3.2.1` (`Qwen3.8-Flash-Next-MaxQ-64GB` `53.99 GiB` & `MaxQ-32GB` `35.71 GiB`, `DeepSeek-V4-Flash-0731-MaxQ-v4` `57.99 GiB`, and `NVIDIA-Nemotron-3.5-30B-A3B` `VQ3-64` `13.30 GiB` / `MaxQ-16GB` `13.39 GiB` / `Abliterated-VQ3-64` `13.30 GiB`)
 **Test machine:** AMD Ryzen 7 9800X3D (8C/16T, 96 MB L3) · 64 GB DDR5 · NVIDIA RTX 4070 Ti 12 GB · NVMe PCIe 5.0
 **OS:** Windows 11 Pro · engine built with MinGW-w64 GCC (UCRT64) + CMake + Ninja, `-march=native` (AVX-512F/BW/VBMI/VNNI/BF16)
-**Original Port & 1M-Context Verification:** [`@MR1KRAKEN`](https://github.com/MR1KRAKEN) ([PR #27](https://github.com/synchopate/llama-modchip/pull/27), [Issue #28](https://github.com/synchopate/llama-modchip/issues/28)); x64 AVX-512 ABI & `VQ3` update in `commit 54c89bf` ([Issue #31](https://github.com/synchopate/llama-modchip/issues/31)); unified `v3.2.0` `RouteCrack 2.0` + Quantized Split-KV + Native HARP-Cache v2 rebase on `llama.cpp` `46eb1742d` (`b12604`)
+**Original Port & 1M-Context Verification:** [`@MR1KRAKEN`](https://github.com/MR1KRAKEN) ([PR #27](https://github.com/synchopate/llama-modchip/pull/27), [Issue #28](https://github.com/synchopate/llama-modchip/issues/28)); x64 AVX-512 ABI & `VQ3` update in `commit 54c89bf` ([Issue #31](https://github.com/synchopate/llama-modchip/issues/31)); unified `v3.2.1` `RouteCrack 2.0` + Quantized Split-KV + Native HARP-Cache v2 + Bounded-Error Inkling-2 Fusion rebase on `llama.cpp` `46eb1742d` (`b12604`)
 
 ---
 
-## 1. Custom vs. Standard Tensor Types in `v3.2.0`
+## 1. Custom vs. Standard Tensor Types in `v3.2.1`
 
-In `v3.2.0`, **`Qwen3.8-Flash-Next-MaxQ-64GB/32GB`**, **`DeepSeek-V4-Flash-0731-MaxQ-v4`**, and **`NVIDIA-Nemotron-3.5-30B-A3B-MaxQ-16GB`** use **100% standard `ggml` tensor types** (`Q1_0 = 41`, `Q2_0 = 42`, `F8_E4M3 = 43` untouched), while CPU-Turbo `Nemotron-VQ3-64` (`13.30 GiB`) uses zero-collision **`GGML_TYPE_FRACTAL_64 = 44`** (`30 B / 64 W`) and **`GGML_TYPE_VQ3_64 = 45`** (`24 B / 64 W`). Stock upstream `llama.cpp` binaries do not register types `44`/`45` (and lack `v3.2.0`'s `RouteCrack 2.0` + `RouteCrack 2.0 L1 Micro-Arbiter`, Quantized Split-KV Decode, Native C++ Chained-Prefix HARP-Cache v2, AVX-512 GDN recurrence, zero-copy 3D MoE `mmap` repack preservation, and `deepseek4` ConeCollapse loader).
+In `v3.2.1`, **`Qwen3.8-Flash-Next-MaxQ-64GB/32GB`**, **`DeepSeek-V4-Flash-0731-MaxQ-v4`**, and **`NVIDIA-Nemotron-3.5-30B-A3B-MaxQ-16GB`** use **100% standard `ggml` tensor types** (`Q1_0 = 41`, `Q2_0 = 42`, `F8_E4M3 = 43` untouched), while CPU-Turbo `Nemotron-VQ3-64` (`13.30 GiB`) uses zero-collision **`GGML_TYPE_FRACTAL_64 = 44`** (`30 B / 64 W`) and **`GGML_TYPE_VQ3_64 = 45`** (`24 B / 64 W`). Stock upstream `llama.cpp` binaries do not register types `44`/`45` (and lack `v3.2.1`'s `RouteCrack 2.0` + `RouteCrack 2.0 L1 Micro-Arbiter`, Quantized Split-KV Decode, Native C++ Chained-Prefix HARP-Cache v2, AVX-512 GDN recurrence, zero-copy 3D MoE `mmap` repack preservation, and `deepseek4` ConeCollapse loader).
 
 ## 2. What had to change for Windows
 
@@ -30,7 +30,7 @@ One runtime constraint: for `deepseek4`/MLA (and recommended for `qwen4exp`/GQA)
 ## 3. Build
 
 ```powershell
-# Unified v3.2.0 CPU engine (supports Qwen3.8, DeepSeek-V4 284B, & Nemotron-30B — default):
+# Unified v3.2.1 CPU engine (supports Qwen3.8, DeepSeek-V4 284B, & Nemotron-30B — default):
 powershell -ExecutionPolicy Bypass -File windows\build_patched_engine.ps1
 
 # Optional MSVC + CUDA hybrid build:
@@ -75,4 +75,4 @@ Net result: on a 12 GB card `DeepSeek-V4 284B` is faster on CPU alone. (For 30B/
 
 ## 7. Summary
 
-All three `v3.2.0` RAM tiers — `Qwen3.8-Flash-Next` (`MaxQ-64GB` `53.99 GiB` & `MaxQ-32GB` `35.71 GiB`), `DeepSeek-V4-Flash 284B` (`MaxQ-v4` `57.99 GiB`, 100% standard `ggml`), and `NVIDIA-Nemotron-3.5-30B-A3B` (`VQ3-64` `13.30 GiB` types `44`/`45`, `MaxQ-16GB` `13.39 GiB` standard `ggml`, and `Fractal-64` `14.36 GiB` type `44`) — compile and run natively on Windows 11 via `windows\build_patched_engine.ps1`, `windows\modchip_dsv4.ps1`, and `windows\modchip_win.ps1`, delivering **8.11 tok/s unpruned `Top-6` decode / 27.55 tok/s `pp512` prefill on Ryzen 9 9950X3D** and **6.35–8.04 tok/s pure decode / 21.3 tok/s prefill up to 1M context on an 8-core Ryzen 7 9800X3D in 64 GB RAM**.
+All three `v3.2.1` RAM tiers — `Qwen3.8-Flash-Next` (`MaxQ-64GB` `53.99 GiB` & `MaxQ-32GB` `35.71 GiB`), `DeepSeek-V4-Flash 284B` (`MaxQ-v4` `57.99 GiB`, 100% standard `ggml`), and `NVIDIA-Nemotron-3.5-30B-A3B` (`VQ3-64` `13.30 GiB` types `44`/`45`, `MaxQ-16GB` `13.39 GiB` standard `ggml`, and `Fractal-64` `14.36 GiB` type `44`) — compile and run natively on Windows 11 via `windows\build_patched_engine.ps1`, `windows\modchip_dsv4.ps1`, and `windows\modchip_win.ps1`, delivering **8.11 tok/s unpruned `Top-6` decode / 27.55 tok/s `pp512` prefill on Ryzen 9 9950X3D** and **6.35–8.04 tok/s pure decode / 21.3 tok/s prefill up to 1M context on an 8-core Ryzen 7 9800X3D in 64 GB RAM**.

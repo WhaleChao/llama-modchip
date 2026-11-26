@@ -5,7 +5,7 @@ web chat. It was written for a **GEEKOM A8: AMD Ryzen 7 8745HS (8 Zen 4 cores wi
 780M iGPU) and 64 GB DDR5**. It also works on other x86 PCs with Fedora.
 
 The script uses:
-- the unified `llama-modchip v3.2.0` engine (`llama.cpp` build `b12604`, commit `46eb1742d` + `../patches/llama-modchip-v3.2.patch`), built from source with
+- the unified `llama-modchip v3.2.1` engine (`llama.cpp` build `b12604`, commit `46eb1742d` + `../patches/llama-modchip-v3.2.patch`), built from source with
   the native CPU backend (AVX-512 / AVX2) and the Vulkan backend (Radeon 780M),
 - the verified `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q4_0.gguf` model from `ggml-org` (SHA-256 checked), and also supports `MaxQ-16GB` (`0` custom types) as well as zero-collision `Fractal-64` (`GGML_TYPE_FRACTAL_64 = 44`) and `LUT-VQ3-64` (`GGML_TYPE_VQ3_64 = 45`) checkpoints,
 - **`RouteCrack 2.0` (`SPEC=routecrack2`)** speculative decoding by default (with `ngram`, `ngram-map-k`, `mtp`, `mtp+ngram`, and `none` overrides). For full 16 GB / 32 GB / 64 GB fleet management, you can also run `../modchip setup` from the repository root.

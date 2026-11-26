@@ -1,12 +1,12 @@
-# `llama-modchip v3.2.0` — Windows 10/11 Launchers & Patched Engine Builder
+# `llama-modchip v3.2.1` — Windows 10/11 Launchers & Patched Engine Builder
 
 The `windows/` directory provides two complementary workflows on Windows 10/11:
 
-1. **Unified `v3.2.0` Patched CPU / CUDA Engine (`RouteCrack 2.0`, Quantized Split-KV, Native HARP-Cache v2, `GGML_TYPE_FRACTAL_64 = 44`, `GGML_TYPE_VQ3_64 = 45`):**
+1. **Unified `v3.2.1` Patched CPU / CUDA Engine (`RouteCrack 2.0`, Quantized Split-KV, Native HARP-Cache v2, `GGML_TYPE_FRACTAL_64 = 44`, `GGML_TYPE_VQ3_64 = 45`):**
    - Build static AVX-512 / AVX2 (or MSVC+CUDA) binaries from source via **[`build_patched_engine.ps1`](build_patched_engine.ps1)** (`-Target qwen38`, `-Target dsv4`, or `-Target nemotron`, applying [`patches/llama-modchip-v3.2.patch`](../patches/llama-modchip-v3.2.patch) onto `ggml-org/llama.cpp @ 46eb1742d` / `b12604`) and launch via **[`AVVIA_DSV4.bat`](AVVIA_DSV4.bat)** ([`modchip_dsv4.ps1`](modchip_dsv4.ps1)) with `--spec-type routecrack2`.
    - Preserves upstream `GGML_TYPE_Q2_0 = 42` and `GGML_TYPE_F8_E4M3 = 43` untouched while supporting `Fractal-64` (`type 44`) and `LUT-VQ3-64` (`type 45`). Verified up to **`1,048,576` (`1M`) context** on Windows 11 (`AMD Ryzen 7 9800X3D`, `64 GB` DDR5). Full instructions in **[`README_WINDOWS_PORT.md`](README_WINDOWS_PORT.md)** and **[`docs/WINDOWS_PORT.md`](../docs/WINDOWS_PORT.md)**.
 2. **1-Click Hybrid GPU + CPU MoE Pack for Standard GGUFs (`RTX / Radeon 8–16 GB` + `16–128 GB RAM`):**
-   - **[`AVVIA_MODCHIP.bat`](AVVIA_MODCHIP.bat)** ([`modchip_win.ps1`](modchip_win.ps1)) automates **Tensor-Role Splitting (`-ngl 99 --n-cpu-moe N --load-mode none`)**, **Asymmetric KV Quantization (`-ctk q8_0 -ctv q4_0 -fa on`)**, **Physical Core Pinning (`-t PhysCores`)**, and **`RouteCrack 2.0` / Draftless N-Gram Speculative Decoding** using patched `v3.2.0` or official `ggml-org/llama.cpp` CUDA / Vulkan binaries.
+   - **[`AVVIA_MODCHIP.bat`](AVVIA_MODCHIP.bat)** ([`modchip_win.ps1`](modchip_win.ps1)) automates **Tensor-Role Splitting (`-ngl 99 --n-cpu-moe N --load-mode none`)**, **Asymmetric KV Quantization (`-ctk q8_0 -ctv q4_0 -fa on`)**, **Physical Core Pinning (`-t PhysCores`)**, and **`RouteCrack 2.0` / Draftless N-Gram Speculative Decoding** using patched `v3.2.1` or official `ggml-org/llama.cpp` CUDA / Vulkan binaries.
 
 ---
 

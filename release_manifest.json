@@ -3,7 +3,7 @@
   "release_version": "3.2.1",
   "release_tag": "v3.2.1",
   "patch_file": "patches/llama-modchip-v3.2.patch",
-  "patch_sha256": "c6d1b07b5abd97388637fced26571cf0d4b0d9c3452e00b008d70732450eafd6",
+  "patch_sha256": "3cf7b16f8b38ee3dacab0626f7acba48019c574e9b680eeca58e3976a592b9f9",
   "upstream_llama_cpp": {
     "commit": "46eb1742d",
     "build_number": 12604
@@ -41,21 +41,21 @@
     "hf_binary_fallback_base": "https://huggingface.co/Synchopate/Qwen3.8-Flash-Next-MaxQ-64GB-GGUF/resolve/main"
   },
   "artifacts": {
-    "llama-server-modchip-linux-x86_64-avx512": "72f88dccd6f8b067e8bddf0a8beb246d7e955c0a87da5e6d997f74089695c6a7",
-    "llama-server-modchip-linux-x86_64-avx2": "94e349d7cd70fcc7812ee02d7a323afff141e2ee604cb7c2f79c18ddf6136493",
-    "llama-server-modchip-linux-x86_64": "94e349d7cd70fcc7812ee02d7a323afff141e2ee604cb7c2f79c18ddf6136493",
-    "llama-cli-modchip-linux-x86_64-avx512": "377a62c728260f06cd9cb155d524831d36e29377d2f428855e160358851d4b41",
-    "llama-cli-modchip-linux-x86_64-avx2": "ae5cd7e0f684f89f5b0114f9ddf84779ede68345d46ca330e9cc3846a4805067",
-    "llama-cli-modchip-linux-x86_64": "ae5cd7e0f684f89f5b0114f9ddf84779ede68345d46ca330e9cc3846a4805067",
-    "llama-bench-modchip-linux-x86_64-avx512": "309a515e4fba7832d6c47313dab7bc6ea06d9a1af1a39bf62c6e559f09993869",
-    "llama-bench-modchip-linux-x86_64-avx2": "a447f76f61a37c2a18763b3089eec109e94fc89126172f4fd5c1239ac20ce4f2",
-    "llama-perplexity-modchip-linux-x86_64-avx512": "9792b8594ac3cd355e0207abf3401567c879d45e4140755c40aecf4417af4761",
-    "llama-perplexity-modchip-linux-x86_64-avx2": "2d016b9583c41c77f2cb61366453432fe9818e47907f1066ab5a2a88f8762a5d",
-    "llama-quantize-modchip-linux-x86_64-avx512": "8d809463e3d1e9a3c2bb2fcfd21b43b54765dce0e54d5559d9183dc7c702b828",
-    "llama-quantize-modchip-linux-x86_64-avx2": "5d4387a643047a4584592b5c4ad2ff9cbf8c2210013c88f1b1f49b292a8027d1"
+    "llama-server-modchip-linux-x86_64-avx512": "19361094462e0338506d3b2a52d55c36055e85b24bc39073fcc2546a94d3311f",
+    "llama-server-modchip-linux-x86_64-avx2": "8216b257491e133977565fb6f65abbe14dd29691b905c415ddfac3cfb5f04ba9",
+    "llama-server-modchip-linux-x86_64": "8216b257491e133977565fb6f65abbe14dd29691b905c415ddfac3cfb5f04ba9",
+    "llama-cli-modchip-linux-x86_64-avx512": "46ef789e882af455d117b1b5f26f0bec34922412b84fe30fa50d52bf455a7ff3",
+    "llama-cli-modchip-linux-x86_64-avx2": "96f41af9a927d6dd5a941bf71f593261c54dda486730681555f025afcb6855f2",
+    "llama-cli-modchip-linux-x86_64": "96f41af9a927d6dd5a941bf71f593261c54dda486730681555f025afcb6855f2",
+    "llama-bench-modchip-linux-x86_64-avx512": "d73d470c42c1269791f8b9cf57311760d32f683a68901735f343cf2e7b097e97",
+    "llama-bench-modchip-linux-x86_64-avx2": "ef973704b947994449bce914910b25ac921452eda85c37a0acd7b05a0b58fea4",
+    "llama-perplexity-modchip-linux-x86_64-avx512": "a8ba309b7682ead18fda1b742a67f8a92653830c37c1ca4cf1e35be9050128b1",
+    "llama-perplexity-modchip-linux-x86_64-avx2": "558819b5e349c887de8d4223919bbca0f97a2113779a0e826da8c19d8f618f5f",
+    "llama-quantize-modchip-linux-x86_64-avx512": "c38db2b6da2ca810680d6f9dc38b488e4ef06c379d1c98dc93a4195f8d91015e",
+    "llama-quantize-modchip-linux-x86_64-avx2": "3a4a4fbbca25cd7540daaf9da9a4206b5667aaf31ad07fe05246f9172192aed1"
   },
   "github_only_artifacts": {
-    "llama-modchip-v3.2.1-linux-x86_64.tar.gz": "652dd445c4a3d47fa36f3e81e832d3a75b95429ded5e9c3ef676d26fbfa01dc0"
+    "llama-modchip-v3.2.1-linux-x86_64.tar.gz": "fc5404aef608a3d9f01f8b04489eb0a537ae44777e63947b818f31cbe543a986"
   },
   "benchmarks": [
     {

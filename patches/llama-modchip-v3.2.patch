@@ -6504,7 +6504,7 @@ index 1dbbe32..183a4c0 100644
  typedef struct {
      ggml_half d;           // delta
 diff --git a/ggml/src/ggml-cpu/arch/x86/quants.c b/ggml/src/ggml-cpu/arch/x86/quants.c
-index 594da26..26dcb74 100644
+index 594da26..97eeeec 100644
 --- a/ggml/src/ggml-cpu/arch/x86/quants.c
 +++ b/ggml/src/ggml-cpu/arch/x86/quants.c
 @@ -22,6 +22,17 @@
@@ -6760,25 +6760,32 @@ index 594da26..26dcb74 100644
          acc0 = q2_0_acc_block_avx2(x + i + 0, y + 2*i + 0, acc0);
          acc1 = q2_0_acc_block_avx2(x + i + 1, y + 2*i + 2, acc1);
      }
-@@ -803,6 +979,12 @@ void ggml_vec_dot_q4_0_q8_0(int n, float * GGML_RESTRICT s, size_t bs, const voi
+@@ -798,11 +974,18 @@ void ggml_vec_dot_q4_0_q8_0(int n, float * GGML_RESTRICT s, size_t bs, const voi
+     float sumf = 0;
+ 
+ #if defined(__AVX2__)
++    const bool nt_pf = ggml_cpu_nt_stream_active;
+     // Initialize accumulator with zeros
+     __m256 acc = _mm256_setzero_ps();
  
      // Main loop
      for (; ib < nb; ++ib) {
 +#if defined(__AVX2__) || defined(__AVX512F__)
 +        // RouteCrack Non-Temporal prefetch: protect L3 KV cache from weight streaming pollution
-+        if (ib + 4 < nb) {
++        if (nt_pf && ib + 4 < nb) {
 +            _mm_prefetch((const char *)&x[ib + 4], _MM_HINT_NTA);
 +        }
 +#endif
          /* Compute combined scale for the block */
          const __m256 d = _mm256_set1_ps( GGML_CPU_FP16_TO_FP32(x[ib].d) * GGML_CPU_FP16_TO_FP32(y[ib].d) );
  
-@@ -1014,7 +1196,37 @@ void ggml_vec_dot_mxfp4_q8_0(int n, float * GGML_RESTRICT s, size_t bs, const vo
+@@ -1014,7 +1197,41 @@ void ggml_vec_dot_mxfp4_q8_0(int n, float * GGML_RESTRICT s, size_t bs, const vo
      int ib = 0;
      float sumf = 0;
  
 -#if defined __AVX2__
 +#if defined(__AVX512VNNI__) && defined(__AVX512BW__)
++    const bool nt_pf = ggml_cpu_nt_stream_active;
 +    const __m128i lut128 = _mm_add_epi8(_mm_loadu_si128((const __m128i *) kvalues_fp4), _mm_set1_epi8(16));
 +    const __m512i lut512 = _mm512_broadcast_i32x4(lut128);
 +    const __m512i m4b512 = _mm512_set1_epi8(0x0f);
@@ -6788,7 +6795,9 @@ index 594da26..26dcb74 100644
 +
 +    for (; ib + 1 < nb; ib += 2) {
 +        if (ib + 6 < nb) {
-+            _mm_prefetch((const char *) &x[ib + 6], _MM_HINT_NTA);
++            if (nt_pf) {
++                _mm_prefetch((const char *) &x[ib + 6], _MM_HINT_NTA);
++            }
 +            _mm_prefetch((const char *) &y[ib + 6], _MM_HINT_T0);
 +        }
 +        const __m128i q4_0 = _mm_loadu_si128((const __m128i *) x[ib + 0].qs);
@@ -6809,47 +6818,56 @@ index 594da26..26dcb74 100644
 +
 +    sumf = hsum_float_16(accum512);
 +#elif defined __AVX2__
++    const bool nt_pf = ggml_cpu_nt_stream_active;
  
      const __m128i values128 = _mm_loadu_si128((const __m128i*)kvalues_fp4);
      const __m128i m4b  = _mm_set1_epi8(0x0f);
-@@ -1024,6 +1236,10 @@ void ggml_vec_dot_mxfp4_q8_0(int n, float * GGML_RESTRICT s, size_t bs, const vo
+@@ -1024,6 +1241,12 @@ void ggml_vec_dot_mxfp4_q8_0(int n, float * GGML_RESTRICT s, size_t bs, const vo
      __m256 accum2 = _mm256_setzero_ps();
  
      for (; ib + 1 < nb; ib += 2) {
 +        if (ib + 6 < nb) {
-+            _mm_prefetch((const char *)&x[ib + 6], _MM_HINT_NTA);
++            if (nt_pf) {
++                _mm_prefetch((const char *)&x[ib + 6], _MM_HINT_NTA);
++            }
 +            _mm_prefetch((const char *)&y[ib + 6], _MM_HINT_T0);
 +        }
          const __m128i q4bits_1 = _mm_loadu_si128((const __m128i*)x[ib + 0].qs);
          const __m128i q4bits_2 = _mm_loadu_si128((const __m128i*)x[ib + 1].qs);
          const __m256i q8b_1 = _mm256_loadu_si256((const __m256i *)y[ib + 0].qs);
-@@ -1244,6 +1460,12 @@ void ggml_vec_dot_q5_0_q8_0(int n, float * GGML_RESTRICT s, size_t bs, const voi
+@@ -1239,11 +1462,18 @@ void ggml_vec_dot_q5_0_q8_0(int n, float * GGML_RESTRICT s, size_t bs, const voi
+     const block_q8_0 * GGML_RESTRICT y = vy;
+ 
+ #if defined(__AVX2__)
++    const bool nt_pf = ggml_cpu_nt_stream_active;
+     // Initialize accumulator with zeros
+     __m256 acc = _mm256_setzero_ps();
  
      // Main loop
      for (; ib < nb; ++ib) {
 +#if defined(__AVX2__) || defined(__AVX512F__)
 +        // RouteCrack Non-Temporal prefetch: protect L3 KV cache from weight streaming pollution
-+        if (ib + 4 < nb) {
++        if (nt_pf && ib + 4 < nb) {
 +            _mm_prefetch((const char *)&x[ib + 4], _MM_HINT_NTA);
 +        }
 +#endif
          /* Compute combined scale for the block */
          const __m256 d = _mm256_set1_ps(GGML_CPU_FP16_TO_FP32(x[ib].d) * GGML_CPU_FP16_TO_FP32(y[ib].d));
  
-@@ -1268,6 +1490,12 @@ void ggml_vec_dot_q5_0_q8_0(int n, float * GGML_RESTRICT s, size_t bs, const voi
+@@ -1268,6 +1498,12 @@ void ggml_vec_dot_q5_0_q8_0(int n, float * GGML_RESTRICT s, size_t bs, const voi
  
      // Main loop
      for (; ib < nb; ++ib) {
 +#if defined(__AVX2__) || defined(__AVX512F__)
 +        // RouteCrack Non-Temporal prefetch: protect L3 KV cache from weight streaming pollution
-+        if (ib + 4 < nb) {
++        if (ggml_cpu_nt_stream_active && ib + 4 < nb) {
 +            _mm_prefetch((const char *)&x[ib + 4], _MM_HINT_NTA);
 +        }
 +#endif
          /* Compute combined scale for the block */
          const __m256 d = _mm256_set1_ps(GGML_CPU_FP16_TO_FP32(x[ib].d) * GGML_CPU_FP16_TO_FP32(y[ib].d));
  
-@@ -1404,12 +1632,41 @@ void ggml_vec_dot_q8_0_q8_0(int n, float * GGML_RESTRICT s, size_t bs, const voi
+@@ -1404,12 +1640,41 @@ void ggml_vec_dot_q8_0_q8_0(int n, float * GGML_RESTRICT s, size_t bs, const voi
      int ib = 0;
      float sumf = 0;
  
@@ -6892,13 +6910,21 @@ index 594da26..26dcb74 100644
          // Compute combined scale for the block
          const __m256 d = _mm256_set1_ps(GGML_CPU_FP16_TO_FP32(x[ib].d) * GGML_CPU_FP16_TO_FP32(y[ib].d));
          __m256i qx = _mm256_loadu_si256((const __m256i *)x[ib].qs);
-@@ -1673,6 +1930,14 @@ void ggml_vec_dot_q2_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
+@@ -1666,6 +1931,7 @@ void ggml_vec_dot_q2_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
+     const int nb = n / QK_K;
+ 
+ #if defined __AVX2__
++    const bool nt_pf = ggml_cpu_nt_stream_active;
+ 
+     const __m256i m3 = _mm256_set1_epi8(3);
+     const __m128i m4 = _mm_set1_epi8(0xF);
+@@ -1673,6 +1939,14 @@ void ggml_vec_dot_q2_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
      __m256 acc = _mm256_setzero_ps();
  
      for (int i = 0; i < nb; ++i) {
 +#if defined(__AVX2__) || defined(__AVX512F__)
 +        // RouteCrack Non-Temporal prefetch: protect L3 KV cache from Q6_K weight streaming
-+        if (i + 2 < nb) {
++        if (nt_pf && i + 2 < nb) {
 +                _mm_prefetch((const char *)&x[i + 2] + 64, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 128, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 192, _MM_HINT_NTA);
@@ -6907,13 +6933,21 @@ index 594da26..26dcb74 100644
  
          const float d = y[i].d * GGML_CPU_FP16_TO_FP32(x[i].d);
          const float dmin = -y[i].d * GGML_CPU_FP16_TO_FP32(x[i].dmin);
-@@ -1872,6 +2137,14 @@ void ggml_vec_dot_q3_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
+@@ -1862,6 +2136,7 @@ void ggml_vec_dot_q3_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
+     const int nb = n / QK_K;
+ 
+ #if defined __AVX2__
++    const bool nt_pf = ggml_cpu_nt_stream_active;
+ 
+     const __m256i m3 = _mm256_set1_epi8(3);
+     const __m256i mone = _mm256_set1_epi8(1);
+@@ -1872,6 +2147,14 @@ void ggml_vec_dot_q3_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
      uint32_t aux[3];
  
      for (int i = 0; i < nb; ++i) {
 +#if defined(__AVX2__) || defined(__AVX512F__)
 +        // RouteCrack Non-Temporal prefetch: protect L3 KV cache from Q6_K weight streaming
-+        if (i + 2 < nb) {
++        if (nt_pf && i + 2 < nb) {
 +                _mm_prefetch((const char *)&x[i + 2] + 64, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 128, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 192, _MM_HINT_NTA);
@@ -6922,13 +6956,13 @@ index 594da26..26dcb74 100644
  
          const float d = y[i].d * GGML_CPU_FP16_TO_FP32(x[i].d);
  
-@@ -1977,6 +2250,14 @@ void ggml_vec_dot_q3_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
+@@ -1977,6 +2260,14 @@ void ggml_vec_dot_q3_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
      const uint32_t *aux;
  
      for (int i = 0; i < nb; ++i) {
 +#if defined(__AVX2__) || defined(__AVX512F__)
 +        // RouteCrack Non-Temporal prefetch: protect L3 KV cache from Q6_K weight streaming
-+        if (i + 2 < nb) {
++        if (ggml_cpu_nt_stream_active && i + 2 < nb) {
 +                _mm_prefetch((const char *)&x[i + 2] + 64, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 128, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 192, _MM_HINT_NTA);
@@ -6937,13 +6971,21 @@ index 594da26..26dcb74 100644
  
          const float d = y[i].d * GGML_CPU_FP16_TO_FP32(x[i].d);
  
-@@ -2144,6 +2425,14 @@ void ggml_vec_dot_q4_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
+@@ -2137,6 +2428,7 @@ void ggml_vec_dot_q4_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
+     uint32_t utmp[4];
+ 
+ #if defined __AVX2__
++    const bool nt_pf = ggml_cpu_nt_stream_active;
+ 
+     const __m256i m4 = _mm256_set1_epi8(0xF);
+ 
+@@ -2144,6 +2436,14 @@ void ggml_vec_dot_q4_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
      __m128 acc_m = _mm_setzero_ps();
  
     for (int i = 0; i < nb; ++i) {
 +#if defined(__AVX2__) || defined(__AVX512F__)
 +        // RouteCrack Non-Temporal prefetch: protect L3 KV cache from Q6_K weight streaming
-+        if (i + 2 < nb) {
++        if (nt_pf && i + 2 < nb) {
 +                _mm_prefetch((const char *)&x[i + 2] + 64, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 128, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 192, _MM_HINT_NTA);
@@ -6952,13 +6994,13 @@ index 594da26..26dcb74 100644
  
          const float d = y[i].d * GGML_CPU_FP16_TO_FP32(x[i].d);
          const float dmin = -y[i].d * GGML_CPU_FP16_TO_FP32(x[i].dmin);
-@@ -2210,6 +2499,14 @@ void ggml_vec_dot_q4_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
+@@ -2210,6 +2510,14 @@ void ggml_vec_dot_q4_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
      __m128 acc_m = _mm_setzero_ps();
  
     for (int i = 0; i < nb; ++i) {
 +#if defined(__AVX2__) || defined(__AVX512F__)
 +        // RouteCrack Non-Temporal prefetch: protect L3 KV cache from Q6_K weight streaming
-+        if (i + 2 < nb) {
++        if (ggml_cpu_nt_stream_active && i + 2 < nb) {
 +                _mm_prefetch((const char *)&x[i + 2] + 64, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 128, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 192, _MM_HINT_NTA);
@@ -6967,11 +7009,19 @@ index 594da26..26dcb74 100644
  
          const float d = y[i].d * GGML_CPU_FP16_TO_FP32(x[i].d);
          const float dmin = -y[i].d * GGML_CPU_FP16_TO_FP32(x[i].dmin);
-@@ -2325,6 +2622,11 @@ void ggml_vec_dot_q5_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
+@@ -2315,6 +2623,7 @@ void ggml_vec_dot_q5_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
+     uint32_t utmp[4];
+ 
+ #if defined __AVX2__
++    const bool nt_pf = ggml_cpu_nt_stream_active;
+ 
+     const __m256i m4 = _mm256_set1_epi8(0xF);
+     const __m128i mzero = _mm_setzero_si128();
+@@ -2325,6 +2634,11 @@ void ggml_vec_dot_q5_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
      float summs = 0.f;
  
      for (int i = 0; i < nb; ++i) {
-+        if (i + 2 < nb) {
++        if (nt_pf && i + 2 < nb) {
 +            _mm_prefetch((const char *)&x[i + 2], _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 64, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 128, _MM_HINT_NTA);
@@ -6979,7 +7029,7 @@ index 594da26..26dcb74 100644
          const uint8_t * GGML_RESTRICT q5 = x[i].qs;
          const int8_t  * GGML_RESTRICT q8 = y[i].qs;
  
-@@ -2373,6 +2675,13 @@ void ggml_vec_dot_q5_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
+@@ -2373,6 +2687,13 @@ void ggml_vec_dot_q5_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
              const __m256i q5_1  = _mm256_add_epi8(q5l_1, q5h_1);
              hmask = _mm256_slli_epi16(hmask, 1);
  
@@ -6993,7 +7043,7 @@ index 594da26..26dcb74 100644
              const __m256i q8_0 = _mm256_loadu_si256((const __m256i*)q8); q8 += 32;
              const __m256i q8_1 = _mm256_loadu_si256((const __m256i*)q8); q8 += 32;
  
-@@ -2383,6 +2692,7 @@ void ggml_vec_dot_q5_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
+@@ -2383,6 +2704,7 @@ void ggml_vec_dot_q5_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
              p16_1 = _mm256_madd_epi16(scale_1, p16_1);
  
              sumi = _mm256_add_epi32(sumi, _mm256_add_epi32(p16_0, p16_1));
@@ -7001,13 +7051,13 @@ index 594da26..26dcb74 100644
  
          }
  
-@@ -2405,6 +2715,14 @@ void ggml_vec_dot_q5_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
+@@ -2405,6 +2727,14 @@ void ggml_vec_dot_q5_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
      float summs = 0.f;
  
      for (int i = 0; i < nb; ++i) {
 +#if defined(__AVX2__) || defined(__AVX512F__)
 +        // RouteCrack Non-Temporal prefetch: protect L3 KV cache from Q6_K weight streaming
-+        if (i + 2 < nb) {
++        if (ggml_cpu_nt_stream_active && i + 2 < nb) {
 +                _mm_prefetch((const char *)&x[i + 2] + 64, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 128, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 192, _MM_HINT_NTA);
@@ -7016,13 +7066,21 @@ index 594da26..26dcb74 100644
  
          const float d = y[i].d * GGML_CPU_FP16_TO_FP32(x[i].d);
          const float dmin = -y[i].d * GGML_CPU_FP16_TO_FP32(x[i].dmin);
-@@ -2526,6 +2844,14 @@ void ggml_vec_dot_q6_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
+@@ -2519,6 +2849,7 @@ void ggml_vec_dot_q6_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
+     const int nb = n / QK_K;
+ 
+ #if defined __AVX2__
++    const bool nt_pf = ggml_cpu_nt_stream_active;
+ 
+     const __m256i m3 = _mm256_set1_epi8(3);
+     const __m256i m15 = _mm256_set1_epi8(15);
+@@ -2526,6 +2857,14 @@ void ggml_vec_dot_q6_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
      __m256 acc = _mm256_setzero_ps();
  
      for (int i = 0; i < nb; ++i) {
 +#if defined(__AVX2__) || defined(__AVX512F__)
 +        // RouteCrack Non-Temporal prefetch: protect L3 KV cache from Q6_K weight streaming
-+        if (i + 2 < nb) {
++        if (nt_pf && i + 2 < nb) {
 +                _mm_prefetch((const char *)&x[i + 2] + 64, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 128, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 192, _MM_HINT_NTA);
@@ -7031,13 +7089,13 @@ index 594da26..26dcb74 100644
  
          const float d = y[i].d * GGML_CPU_FP16_TO_FP32(x[i].d);
  
-@@ -2597,6 +2923,14 @@ void ggml_vec_dot_q6_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
+@@ -2597,6 +2936,14 @@ void ggml_vec_dot_q6_K_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const voi
      __m256 acc = _mm256_setzero_ps();
  
      for (int i = 0; i < nb; ++i) {
 +#if defined(__AVX2__) || defined(__AVX512F__)
 +        // RouteCrack Non-Temporal prefetch: protect L3 KV cache from Q6_K weight streaming
-+        if (i + 2 < nb) {
++        if (ggml_cpu_nt_stream_active && i + 2 < nb) {
 +                _mm_prefetch((const char *)&x[i + 2] + 64, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 128, _MM_HINT_NTA);
 +            _mm_prefetch((const char *)&x[i + 2] + 192, _MM_HINT_NTA);
@@ -7046,19 +7104,20 @@ index 594da26..26dcb74 100644
  
          const float d = y[i].d * GGML_CPU_FP16_TO_FP32(x[i].d);
  
-@@ -2752,7 +3086,46 @@ void ggml_vec_dot_iq2_xxs_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const
+@@ -2752,7 +3099,48 @@ void ggml_vec_dot_iq2_xxs_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const
  
      const int nb = n / QK_K;
  
 -#if defined(__AVX2__)
 +#if defined(__AVX512F__) && defined(__AVX512BW__) && defined(__AVX512VL__) && defined(__BMI2__)
++    const bool nt_pf = ggml_cpu_nt_stream_active;
 +    uint32_t aux32[4];
 +    const uint8_t * aux8 = (const uint8_t *)aux32;
 +    const __m512i zero512 = _mm512_setzero_si512();
 +    __m256 accumf = _mm256_setzero_ps();
 +
 +    for (int i = 0; i < nb; ++i) {
-+        if (i + 2 < nb) {
++        if (nt_pf && i + 2 < nb) {
 +            _mm_prefetch((const char *)&x[i + 2] + 64, _MM_HINT_NTA);
 +        }
 +        const float d = GGML_CPU_FP16_TO_FP32(x[i].d) * y[i].d;
@@ -7091,20 +7150,21 @@ index 594da26..26dcb74 100644
 +    }
 +    *s = 0.125f * hsum_float_8(accumf);
 +#elif defined(__AVX2__)
++    const bool nt_pf = ggml_cpu_nt_stream_active;
  
      const uint64_t * signs64 = (const uint64_t *)keven_signs_q2xs;
  
-@@ -2761,6 +3134,9 @@ void ggml_vec_dot_iq2_xxs_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const
+@@ -2761,6 +3149,9 @@ void ggml_vec_dot_iq2_xxs_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const
  
      __m256 accumf = _mm256_setzero_ps();
      for (int i = 0; i < nb; ++i) {
-+        if (i + 2 < nb) {
++        if (nt_pf && i + 2 < nb) {
 +                _mm_prefetch((const char *)&x[i + 2] + 64, _MM_HINT_NTA);
 +        }
          const float d = GGML_CPU_FP16_TO_FP32(x[i].d) * y[i].d;
          const uint16_t * GGML_RESTRICT q2 = x[i].qs;
          const int8_t   * GGML_RESTRICT q8 = y[i].qs;
-@@ -3686,10 +4062,47 @@ void ggml_vec_dot_iq1_s_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
+@@ -3686,10 +4077,47 @@ void ggml_vec_dot_iq1_s_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
  
      const int nb = n / QK_K;
  
@@ -7153,7 +7213,7 @@ index 594da26..26dcb74 100644
      for (int i = 0; i < nb; ++i) {
  
          const int8_t   * q8 = y[i].qs;
-@@ -3702,10 +4115,8 @@ void ggml_vec_dot_iq1_s_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
+@@ -3702,10 +4130,8 @@ void ggml_vec_dot_iq1_s_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
  #ifdef __BMI2__
              const uint64_t packed_idx1 = _pdep_u64(*(const uint32_t *)qs, 0x00ff00ff00ff00ffULL) | _pdep_u64(qh[ib], 0x700070007000700ULL);
              const uint64_t packed_idx2 = _pdep_u64(*(const uint32_t *)(qs + 4), 0x00ff00ff00ff00ffULL) | _pdep_u64(qh[ib + 1], 0x700070007000700ULL);
@@ -7166,7 +7226,7 @@ index 594da26..26dcb74 100644
  #else
              const __m256i q1b_1 = _mm256_set_epi64x(iq1s_grid[qs[3] | ((qh[ib+0] >> 1) & 0x700)], iq1s_grid[qs[2] | ((qh[ib+0] << 2) & 0x700)],
                                                      iq1s_grid[qs[1] | ((qh[ib+0] << 5) & 0x700)], iq1s_grid[qs[0] | ((qh[ib+0] << 8) & 0x700)]);
-@@ -3716,8 +4127,8 @@ void ggml_vec_dot_iq1_s_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
+@@ -3716,8 +4142,8 @@ void ggml_vec_dot_iq1_s_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
              const __m256i q8b_1 = _mm256_loadu_si256((const __m256i*)q8); q8 += 32;
              const __m256i q8b_2 = _mm256_loadu_si256((const __m256i*)q8); q8 += 32;
  
@@ -7177,7 +7237,7 @@ index 594da26..26dcb74 100644
              const int16_t ls1 = 2*((qh[ib+0] >> 12) & 7) + 1;
              const int16_t ls2 = 2*((qh[ib+1] >> 12) & 7) + 1;
              const __m256i p1 = _mm256_madd_epi16(dot1, _mm256_set1_epi16(ls1));
-@@ -3727,7 +4138,6 @@ void ggml_vec_dot_iq1_s_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
+@@ -3727,7 +4153,6 @@ void ggml_vec_dot_iq1_s_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
              sumi1 += (y[i].bsums[2*ib+0] + y[i].bsums[2*ib+1]) * (qh[ib+0] & 0x8000 ? -1 : 1) * ls1
                     + (y[i].bsums[2*ib+2] + y[i].bsums[2*ib+3]) * (qh[ib+1] & 0x8000 ? -1 : 1) * ls2;
          }
@@ -7185,7 +7245,7 @@ index 594da26..26dcb74 100644
          const float d = y[i].d * GGML_CPU_FP16_TO_FP32(x[i].d);
          accum = _mm256_fmadd_ps(_mm256_set1_ps(d), _mm256_cvtepi32_ps(sumi), accum);
          accum1 += d * sumi1;
-@@ -3839,14 +4249,14 @@ void ggml_vec_dot_iq1_m_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
+@@ -3839,14 +4264,14 @@ void ggml_vec_dot_iq1_m_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
          __m256i sumi2 = _mm256_setzero_si256();
          for (int ib = 0; ib < QK_K/32; ib += 2) {
  #ifdef __BMI2__
@@ -7204,7 +7264,7 @@ index 594da26..26dcb74 100644
  
              // Convert signs to bytes 0x81 (negative) or 0x01 (positive)
              const uint64_t delta_sign = _pdep_u64(*(const uint32_t*)(qh) & 0x88888888, 0xf0f0f0f0f0f0f0f0ULL);
-@@ -4188,3 +4598,2530 @@ void ggml_vec_dot_iq4_xs_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const v
+@@ -4188,3 +4613,2531 @@ void ggml_vec_dot_iq4_xs_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const v
      ggml_vec_dot_iq4_xs_q8_K_generic(n, s, bs, vx, bx, vy, by, nrc);
  #endif
  }
@@ -9655,6 +9715,7 @@ index 594da26..26dcb74 100644
 +    const __m512i m4b512  = _mm512_set1_epi8(0x0f);
 +    const __m512i zero512 = _mm512_setzero_si512();
 +    const __m512i bias512 = _mm512_set1_epi8(16);
++    const bool nt_pf = ggml_cpu_nt_stream_active;
 +    __m512 acc[8];
 +    for (int k = 0; k < K; ++k) {
 +        acc[k] = _mm512_setzero_ps();
@@ -9662,7 +9723,7 @@ index 594da26..26dcb74 100644
 +
 +    int ib = 0;
 +    for (; ib + 1 < nb; ib += 2) {
-+        if (ib + 6 < nb) {
++        if (nt_pf && ib + 6 < nb) {
 +            _mm_prefetch((const char *) &x[ib + 6], _MM_HINT_NTA);
 +        }
 +        const float dx0 = GGML_CPU_E8M0_TO_FP32_HALF(x[ib + 0].e);
@@ -14974,7 +15035,7 @@ index 7122143..f4b1a0b 100644
      // Get the model file type (quantization) as a string, e.g. "Q8_0" or "Q4_K - Medium"
      LLAMA_API const char * llama_ftype_name(enum llama_ftype ftype);
 diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
-index 269b920..70c042e 100644
+index 269b920..baa8dc5 100644
 --- a/src/llama-graph.cpp
 +++ b/src/llama-graph.cpp
 @@ -1,4 +1,5 @@
@@ -14983,7 +15044,7 @@ index 269b920..70c042e 100644
  
  #include "llama-impl.h"
  #include "llama-model.h"
-@@ -2443,103 +2444,145 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+@@ -2443,103 +2444,148 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
      }
      cb(probs, "ffn_moe_probs", il);
  
@@ -14994,16 +15055,19 @@ index 269b920..70c042e 100644
 -        selection_probs = ggml_add(ctx0, probs, exp_probs_b);
 -        cb(selection_probs, "ffn_moe_probs_biased", il);
 -    }
-+    // Fast fused Sigmoid MoE router top-k + weight normalization (CPU-resident layers)
++    // Fast fused Sigmoid MoE router top-k + weight normalization (Inkling-2 CPU layers, pruning disabled)
 +    // Replaces 7 tiny barrier nodes -> 2 single-core ops while preserving router `probs`.
 +    const bool use_fused_sigmoid_router =
 +        modchip_ink2::fusion_enabled(9) &&
-+        modchip_ink2::tensor_on_cpu(gate_inp) &&
++        (arch == LLM_ARCH_INKLING2 || arch == LLM_ARCH_INKLING2_LOOP) &&
++        !modchip_ink2::moe_prune_env_active() &&
++        modchip_ink2::tensor_on_cpu(probs_in ? probs_in : gate_inp) &&
++        modchip_ink2::tensor_on_cpu(exp_probs_b) &&
++        modchip_ink2::tensor_on_cpu(down_exps) &&
++        modchip_ink2::tensor_on_cpu(cur) &&
 +        gating_op == LLAMA_EXPERT_GATING_FUNC_TYPE_SIGMOID &&
 +        hparams.n_expert_groups <= 1 &&
 +        selected_experts_in == nullptr &&
-+        arch != LLM_ARCH_LLAMA4 &&
-+        arch != LLM_ARCH_GROVEMOE &&
 +        n_expert_used <= 64 &&
 +        probs->type == GGML_TYPE_F32 &&
 +        (!exp_probs_b || exp_probs_b->type == GGML_TYPE_F32);
@@ -15208,7 +15272,7 @@ index 269b920..70c042e 100644
      }
  
      //call early so that topk-moe can be used
-@@ -2670,12 +2713,25 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+@@ -2670,12 +2716,30 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
                      const float beta = hparams.situ_beta;
                      const float lb   = hparams.situ_linear_beta;
  
@@ -15217,7 +15281,12 @@ index 269b920..70c042e 100644
 -                    if (lb > 0.0f) {
 -                        up = ggml_scale(ctx0, ggml_tanh(ctx0, ggml_scale(ctx0, up, 1.0f/lb)), lb);
 +                    if (modchip_ink2::fusion_enabled(0) &&
++                        modchip_ink2::tensor_on_cpu(cur) &&
++                        modchip_ink2::tensor_on_cpu(up) &&
 +                        modchip_ink2::tensor_on_cpu(down_exps) &&
++                        modchip_ink2::tensor_on_cpu(gate_up_exps) &&
++                        modchip_ink2::tensor_on_cpu(gate_exps) &&
++                        modchip_ink2::tensor_on_cpu(up_exps) &&
 +                        cur->type == GGML_TYPE_F32 &&
 +                        up->type == GGML_TYPE_F32) {
 +                        const int64_t nrows = cur->ne[1] * cur->ne[2] * cur->ne[3];
@@ -15239,7 +15308,7 @@ index 269b920..70c042e 100644
                      cb(cur, "ffn_moe_situ", il);
                  } break;
              case LLM_FFN_GELU:
-@@ -2775,7 +2831,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+@@ -2775,7 +2839,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
      // Use per-layer n_expert_used to bound the graph even during warmup (avoids
      // the large-add-nodes issue for uniform arches; for Puzzle the per-layer
      // value is correct). ref: https://github.com/ggml-org/llama.cpp/pull/14753
@@ -15250,16 +15319,17 @@ index 269b920..70c042e 100644
  
 diff --git a/src/llama-inkling2-fused.h b/src/llama-inkling2-fused.h
 new file mode 100644
-index 0000000..026e76c
+index 0000000..2ab1158
 --- /dev/null
 +++ b/src/llama-inkling2-fused.h
-@@ -0,0 +1,1230 @@
+@@ -0,0 +1,1241 @@
 +#pragma once
 +
 +// =============================================================================
-+// Modchip Inkling-2 Zero-Loss AVX-512 Graph Fusion (`llama-inkling2-fused.h`)
++// Modchip Inkling-2 Bounded-Error AVX-512 Graph Fusion (`llama-inkling2-fused.h`)
 +// Eliminates ~4,300+ cross-CCD threadpool barriers & intermediate DRAM passes
-+// per token on Inkling-2-Mini (48 logical layers) with 0.0000 PPL drift:
++// per token on Inkling-2-Mini (48 logical layers), bounded-error (<1 ULP) &
++// empirically parity-verified:
 +//   1. Fused SiTU activation (`LLM_FFN_SITU`):   9 nodes  -> 1 node  (-384/tok)
 +//   2. Fused L2 row clip (+scale +tau):          7-10     -> 1 node  (-1,008/tok)
 +//   3. Fused depth attention `mix()`:            10-16    -> 1 node  (-1,220/tok)
@@ -15277,11 +15347,14 @@ index 0000000..026e76c
 +#include "ggml.h"
 +#include "ggml-backend.h"
 +
++#include <algorithm>
 +#include <atomic>
 +#include <cmath>
 +#include <cstdint>
 +#include <cstdlib>
 +#include <cstring>
++#include <deque>
++#include <mutex>
 +
 +#if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__)) && !defined(MODCHIP_INK2_DISABLE_AVX512)
 +#define MODCHIP_INK2_HAS_AVX512_TARGET 1
@@ -15295,16 +15368,14 @@ index 0000000..026e76c
 +namespace modchip_ink2 {
 +
 +inline int fusion_mask() {
-+    static int mask = -1;
-+    if (mask < 0) {
++    static const int mask = []() {
 +        const char * env_f = std::getenv("MODCHIP_INK2_FUSE");
 +        if (env_f && std::atoi(env_f) == 0) {
-+            mask = 0;
-+        } else {
-+            const char * env_m = std::getenv("MODCHIP_INK2_FUSE_MASK");
-+            mask = (env_m && env_m[0]) ? (int) std::strtol(env_m, nullptr, 0) : 0x2FF;
++            return 0;
 +        }
-+    }
++        const char * env_m = std::getenv("MODCHIP_INK2_FUSE_MASK");
++        return (env_m && env_m[0]) ? (int) std::strtol(env_m, nullptr, 0) : 0x2FF;
++    }();
 +    return mask;
 +}
 +
@@ -15313,7 +15384,18 @@ index 0000000..026e76c
 +    return (bit < 0) ? (m != 0) : ((m & (1 << bit)) != 0);
 +}
 +
++inline bool moe_prune_env_active() {
++    auto is_set = [](const char * name) {
++        const char * v = std::getenv(name);
++        return v != nullptr && v[0] != '\0';
++    };
++    return is_set("LLAMA_MOE_TOP_K") || is_set("DSV4_MOE_CFG_PATH") || is_set("DSV4_MOE_TOPK") || is_set("DSV4_MOE_MIN_W");
++}
++
 +inline bool tensor_on_cpu(const struct ggml_tensor * t) {
++    while (t && !t->buffer && t->view_src) {
++        t = t->view_src;
++    }
 +    if (!t || !t->buffer) {
 +        return true;
 +    }
@@ -15324,15 +15406,13 @@ index 0000000..026e76c
 +
 +inline bool has_avx512f() {
 +#if MODCHIP_INK2_HAS_AVX512_TARGET
-+    static int cached = -1;
-+    if (cached < 0) {
++    static const int cached = []() {
 +        const char * no_simd = std::getenv("MODCHIP_INK2_NO_SIMD");
 +        if (no_simd && std::atoi(no_simd) > 0) {
-+            cached = 0;
-+        } else {
-+            cached = (__builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512dq") && __builtin_cpu_supports("fma")) ? 1 : 0;
++            return 0;
 +        }
-+    }
++        return (__builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512dq") && __builtin_cpu_supports("fma")) ? 1 : 0;
++    }();
 +    return cached != 0;
 +#else
 +    return false;
@@ -15347,8 +15427,20 @@ index 0000000..026e76c
 +}
 +
 +// =============================================================================
-+// Parameter Interning (lock-free, lifetime = process)
++// Parameter Interning (mutex-guarded append-only std::deque, pointer-stable)
 +// =============================================================================
++template <typename T, typename EqPred>
++inline void * intern_append_only(std::mutex & mtx, std::deque<T> & slots, const T & cand, EqPred same) {
++    std::lock_guard<std::mutex> lock(mtx);
++    for (auto & item : slots) {
++        if (same(item, cand)) {
++            return &item;
++        }
++    }
++    slots.push_back(cand);
++    return &slots.back();
++}
++
 +struct SituParams {
 +    float beta;
 +    float inv_beta;
@@ -15357,26 +15449,17 @@ index 0000000..026e76c
 +};
 +
 +inline void * intern_situ_params(float beta, float lb) {
-+    static constexpr int MAX_SLOTS = 32;
-+    static SituParams slots[MAX_SLOTS];
-+    static std::atomic<int> count{0};
-+    const int n = count.load(std::memory_order_acquire);
-+    for (int i = 0; i < n && i < MAX_SLOTS; ++i) {
-+        if (slots[i].beta == beta && slots[i].lb == lb) {
-+            return &slots[i];
-+        }
-+    }
-+    const int idx = count.fetch_add(1, std::memory_order_acq_rel);
-+    if (idx < MAX_SLOTS) {
-+        slots[idx] = SituParams{
-+            beta,
-+            (beta != 0.0f) ? (1.0f / beta) : 0.0f,
-+            lb,
-+            (lb > 0.0f) ? (1.0f / lb) : 0.0f,
-+        };
-+        return &slots[idx];
-+    }
-+    return &slots[0];
++    static std::mutex mtx;
++    static std::deque<SituParams> slots;
++    const SituParams cand{
++        beta,
++        (beta != 0.0f) ? (1.0f / beta) : 0.0f,
++        lb,
++        (lb > 0.0f) ? (1.0f / lb) : 0.0f,
++    };
++    return intern_append_only(mtx, slots, cand, [](const SituParams & a, const SituParams & b) {
++        return a.beta == b.beta && a.lb == b.lb;
++    });
 +}
 +
 +struct ClipParams {
@@ -15386,21 +15469,12 @@ index 0000000..026e76c
 +};
 +
 +inline void * intern_clip_params(float threshold, int scale_idx, int tau_idx) {
-+    static constexpr int MAX_SLOTS = 64;
-+    static ClipParams slots[MAX_SLOTS];
-+    static std::atomic<int> count{0};
-+    const int n = count.load(std::memory_order_acquire);
-+    for (int i = 0; i < n && i < MAX_SLOTS; ++i) {
-+        if (slots[i].threshold == threshold && slots[i].scale_idx == scale_idx && slots[i].tau_idx == tau_idx) {
-+            return &slots[i];
-+        }
-+    }
-+    const int idx = count.fetch_add(1, std::memory_order_acq_rel);
-+    if (idx < MAX_SLOTS) {
-+        slots[idx] = ClipParams{ threshold, scale_idx, tau_idx };
-+        return &slots[idx];
-+    }
-+    return &slots[0];
++    static std::mutex mtx;
++    static std::deque<ClipParams> slots;
++    const ClipParams cand{ threshold, scale_idx, tau_idx };
++    return intern_append_only(mtx, slots, cand, [](const ClipParams & a, const ClipParams & b) {
++        return a.threshold == b.threshold && a.scale_idx == b.scale_idx && a.tau_idx == b.tau_idx;
++    });
 +}
 +
 +struct MixParams {
@@ -15409,21 +15483,12 @@ index 0000000..026e76c
 +};
 +
 +inline void * intern_mix_params(int n_states, float inv_sqrt_d) {
-+    static constexpr int MAX_SLOTS = 64;
-+    static MixParams slots[MAX_SLOTS];
-+    static std::atomic<int> count{0};
-+    const int n = count.load(std::memory_order_acquire);
-+    for (int i = 0; i < n && i < MAX_SLOTS; ++i) {
-+        if (slots[i].n_states == n_states && slots[i].inv_sqrt_d == inv_sqrt_d) {
-+            return &slots[i];
-+        }
-+    }
-+    const int idx = count.fetch_add(1, std::memory_order_acq_rel);
-+    if (idx < MAX_SLOTS) {
-+        slots[idx] = MixParams{ n_states, inv_sqrt_d };
-+        return &slots[idx];
-+    }
-+    return &slots[0];
++    static std::mutex mtx;
++    static std::deque<MixParams> slots;
++    const MixParams cand{ n_states, inv_sqrt_d };
++    return intern_append_only(mtx, slots, cand, [](const MixParams & a, const MixParams & b) {
++        return a.n_states == b.n_states && a.inv_sqrt_d == b.inv_sqrt_d;
++    });
 +}
 +
 +struct ConvParams {
@@ -15435,65 +15500,46 @@ index 0000000..026e76c
 +};
 +
 +inline void * intern_conv_params(int64_t n_conv, int64_t n_seq_tokens, int64_t n_seqs, int has_dynamic, float inv_sqrt) {
-+    static constexpr int MAX_SLOTS = 128;
-+    static ConvParams slots[MAX_SLOTS];
-+    static std::atomic<int> count{0};
-+    const int n = count.load(std::memory_order_acquire);
-+    for (int i = 0; i < n && i < MAX_SLOTS; ++i) {
-+        if (slots[i].n_conv == n_conv &&
-+            slots[i].n_seq_tokens == n_seq_tokens &&
-+            slots[i].n_seqs == n_seqs &&
-+            slots[i].has_dynamic == has_dynamic &&
-+            slots[i].inv_sqrt == inv_sqrt) {
-+            return &slots[i];
-+        }
-+    }
-+    const int idx = count.fetch_add(1, std::memory_order_acq_rel);
-+    if (idx < MAX_SLOTS) {
-+        slots[idx] = ConvParams{ n_conv, n_seq_tokens, n_seqs, has_dynamic, inv_sqrt };
-+        return &slots[idx];
-+    }
-+    static std::atomic<int> ring{0};
-+    const int ridx = MAX_SLOTS / 2 + (ring.fetch_add(1, std::memory_order_relaxed) % (MAX_SLOTS / 2));
-+    slots[ridx] = ConvParams{ n_conv, n_seq_tokens, n_seqs, has_dynamic, inv_sqrt };
-+    return &slots[ridx];
++    static std::mutex mtx;
++    static std::deque<ConvParams> slots;
++    const ConvParams cand{ n_conv, n_seq_tokens, n_seqs, has_dynamic, inv_sqrt };
++    return intern_append_only(mtx, slots, cand, [](const ConvParams & a, const ConvParams & b) {
++        return a.n_conv == b.n_conv &&
++               a.n_seq_tokens == b.n_seq_tokens &&
++               a.n_seqs == b.n_seqs &&
++               a.has_dynamic == b.has_dynamic &&
++               a.inv_sqrt == b.inv_sqrt;
++    });
 +}
 +
 +inline void * intern_float_param(float v) {
-+    static constexpr int MAX_SLOTS = 64;
-+    static float slots[MAX_SLOTS];
-+    static std::atomic<int> count{0};
-+    const int n = count.load(std::memory_order_acquire);
-+    for (int i = 0; i < n && i < MAX_SLOTS; ++i) {
-+        if (slots[i] == v) {
-+            return &slots[i];
-+        }
-+    }
-+    const int idx = count.fetch_add(1, std::memory_order_acq_rel);
-+    if (idx < MAX_SLOTS) {
-+        slots[idx] = v;
-+        return &slots[idx];
-+    }
-+    return &slots[0];
++    static std::mutex mtx;
++    static std::deque<float> slots;
++    return intern_append_only(mtx, slots, v, [](const float & a, const float & b) {
++        return a == b;
++    });
 +}
 +
 +// =============================================================================
-+// AVX-512 < 0.5 ULP Math Helpers + Targeted Kernel Implementations
++// AVX-512 Bounded-Error (<1 ULP) Math Helpers + Targeted Kernel Implementations
 +// =============================================================================
 +#if MODCHIP_INK2_HAS_AVX512_TARGET
 +
 +MODCHIP_AVX512_INLINE __m512 fast_exp_ps(__m512 x) {
++    const __mmask16 m_nan = _mm512_cmp_ps_mask(x, x, _CMP_UNORD_Q);
 +    const __m512 lo = _mm512_set1_ps(-87.0f);
 +    const __m512 hi = _mm512_set1_ps(88.0f);
++    const __m512 ovf = _mm512_set1_ps(88.7228f);
 +    const __mmask16 mask_nonzero = _mm512_cmp_ps_mask(x, lo, _CMP_GT_OQ);
-+    x = _mm512_min_ps(_mm512_max_ps(x, lo), hi);
++    const __mmask16 mask_inf     = _mm512_cmp_ps_mask(x, ovf, _CMP_GT_OQ);
++    const __m512 xc = _mm512_min_ps(_mm512_max_ps(x, lo), hi);
 +
 +    const __m512 log2e  = _mm512_set1_ps(1.44269504088896341f);
 +    const __m512 ln2_hi = _mm512_set1_ps(0.693359375f);
 +    const __m512 ln2_lo = _mm512_set1_ps(-2.12194440e-4f);
 +
-+    const __m512 fx = _mm512_roundscale_ps(_mm512_mul_ps(x, log2e), _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
-+    __m512 r = _mm512_fnmadd_ps(fx, ln2_hi, x);
++    const __m512 fx = _mm512_roundscale_ps(_mm512_mul_ps(xc, log2e), _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
++    __m512 r = _mm512_fnmadd_ps(fx, ln2_hi, xc);
 +    r = _mm512_fnmadd_ps(fx, ln2_lo, r);
 +
 +    __m512 p = _mm512_fmadd_ps(_mm512_set1_ps(1.0f / 5040.0f), r, _mm512_set1_ps(1.0f / 720.0f));
@@ -15506,10 +15552,12 @@ index 0000000..026e76c
 +
 +    const __m512i k = _mm512_cvtps_epi32(fx);
 +    const __m512 pow2k = _mm512_castsi512_ps(_mm512_slli_epi32(_mm512_add_epi32(k, _mm512_set1_epi32(127)), 23));
-+    return _mm512_maskz_mul_ps(mask_nonzero, p, pow2k);
++    const __m512 res = _mm512_mask_blend_ps(mask_inf, _mm512_maskz_mul_ps(mask_nonzero, p, pow2k), _mm512_set1_ps(INFINITY));
++    return _mm512_mask_blend_ps(m_nan, res, x);
 +}
 +
 +MODCHIP_AVX512_INLINE __m512 fast_tanh_ps(__m512 x) {
++    const __mmask16 m_nan = _mm512_cmp_ps_mask(x, x, _CMP_UNORD_Q);
 +    const __m512 sign_mask = _mm512_castsi512_ps(_mm512_set1_epi32(0x80000000));
 +    const __m512 sign = _mm512_and_ps(x, sign_mask);
 +    const __m512 ax   = _mm512_andnot_ps(sign_mask, x);
@@ -15525,17 +15573,18 @@ index 0000000..026e76c
 +    const __m512 one = _mm512_set1_ps(1.0f);
 +    const __m512 tb  = _mm512_or_ps(_mm512_div_ps(_mm512_sub_ps(one, e), _mm512_add_ps(one, e)), sign);
 +
-+    return _mm512_mask_blend_ps(m_small, tb, ts);
++    return _mm512_mask_blend_ps(m_nan, _mm512_mask_blend_ps(m_small, tb, ts), x);
 +}
 +
 +MODCHIP_AVX512_INLINE __m512 fast_sigmoid_ps(__m512 x) {
++    const __mmask16 m_nan = _mm512_cmp_ps_mask(x, x, _CMP_UNORD_Q);
 +    const __m512 sign_mask = _mm512_castsi512_ps(_mm512_set1_epi32(0x80000000));
 +    const __m512 ax  = _mm512_andnot_ps(sign_mask, x);
 +    const __mmask16 m_neg = _mm512_cmp_ps_mask(x, _mm512_setzero_ps(), _CMP_LT_OQ);
 +    const __m512 e   = fast_exp_ps(_mm512_sub_ps(_mm512_setzero_ps(), ax));
 +    const __m512 one = _mm512_set1_ps(1.0f);
 +    const __m512 inv = _mm512_div_ps(one, _mm512_add_ps(one, e));
-+    return _mm512_mask_mul_ps(inv, m_neg, e, inv);
++    return _mm512_mask_blend_ps(m_nan, _mm512_mask_mul_ps(inv, m_neg, e, inv), x);
 +}
 +
 +MODCHIP_AVX512_FN inline void fused_situ_avx512(
@@ -15749,6 +15798,10 @@ index 0000000..026e76c
 +                    vsq = _mm512_fmadd_ps(vs, vs, vsq);
 +                }
 +                sum_sq = _mm512_reduce_add_ps(vsq);
++                for (; i < n_embd; ++i) {
++                    const float v = sp[i];
++                    sum_sq += v * v;
++                }
 +                for (int64_t q = 0; q < n_q; ++q) {
 +                    __m512 vdq = _mm512_setzero_ps();
 +                    const float * qp = q_ptrs[q];
@@ -16374,21 +16427,12 @@ index 0000000..026e76c
 +};
 +
 +inline void * intern_moe_router_w_params(int norm_w, float norm_eps, float w_scale) {
-+    static constexpr int MAX_SLOTS = 32;
-+    static MoeRouterWParams slots[MAX_SLOTS];
-+    static std::atomic<int> count{0};
-+    const int n = count.load(std::memory_order_acquire);
-+    for (int i = 0; i < n && i < MAX_SLOTS; ++i) {
-+        if (slots[i].norm_w == norm_w && slots[i].norm_eps == norm_eps && slots[i].w_scale == w_scale) {
-+            return &slots[i];
-+        }
-+    }
-+    const int idx = count.fetch_add(1, std::memory_order_acq_rel);
-+    if (idx < MAX_SLOTS) {
-+        slots[idx] = MoeRouterWParams{ norm_w, norm_eps, w_scale };
-+        return &slots[idx];
-+    }
-+    return &slots[0];
++    static std::mutex mtx;
++    static std::deque<MoeRouterWParams> slots;
++    const MoeRouterWParams cand{ norm_w, norm_eps, w_scale };
++    return intern_append_only(mtx, slots, cand, [](const MoeRouterWParams & a, const MoeRouterWParams & b) {
++        return a.norm_w == b.norm_w && a.norm_eps == b.norm_eps && a.w_scale == b.w_scale;
++    });
 +}
 +
 +// dst->src[0] = probs [n_expert, n_tokens], optional dst->src[1] = exp_probs_b [n_expert]
@@ -16405,29 +16449,56 @@ index 0000000..026e76c
 +    const int64_t t0 = dt * ith;
 +    const int64_t t1 = (t0 + dt < n_tokens) ? (t0 + dt) : n_tokens;
 +
++    const int K = (k_used > 0 && n_expert > 0)
++        ? (int) std::min<int64_t>(k_used, std::min<int64_t>(n_expert, 64))
++        : 0;
++
++    auto is_better = [](float a, float b) -> bool {
++        if (std::isnan(a)) {
++            return false;
++        }
++        if (std::isnan(b)) {
++            return true;
++        }
++        return a > b;
++    };
++
 +    for (int64_t t = t0; t < t1; ++t) {
 +        const float * pr  = (const float *) ((const char *) probs->data + t * probs->nb[1]);
 +        int32_t     * out = (int32_t *)     ((char *) dst->data         + t * dst->nb[1]);
 +
++        if (k_used <= 0) {
++            continue;
++        }
++        if (K == 0) {
++            for (int64_t j = 0; j < k_used; ++j) {
++                out[j] = 0;
++            }
++            continue;
++        }
++
 +        float   top_v[64];
 +        int32_t top_i[64];
++        for (int j = 0; j < 64; ++j) {
++            top_v[j] = -INFINITY;
++            top_i[j] = 0;
++        }
 +        int filled = 0;
-+        const int K = (int) k_used;
 +
 +        for (int32_t e = 0; e < (int32_t) n_expert; ++e) {
 +            const float v = bp ? (pr[e] + bp[e]) : pr[e];
 +            if (filled < K) {
 +                int pos = filled++;
-+                while (pos > 0 && v > top_v[pos - 1]) {
++                while (pos > 0 && is_better(v, top_v[pos - 1])) {
 +                    top_v[pos] = top_v[pos - 1];
 +                    top_i[pos] = top_i[pos - 1];
 +                    --pos;
 +                }
 +                top_v[pos] = v;
 +                top_i[pos] = e;
-+            } else if (v > top_v[K - 1]) {
++            } else if (is_better(v, top_v[K - 1])) {
 +                int pos = K - 1;
-+                while (pos > 0 && v > top_v[pos - 1]) {
++                while (pos > 0 && is_better(v, top_v[pos - 1])) {
 +                    top_v[pos] = top_v[pos - 1];
 +                    top_i[pos] = top_i[pos - 1];
 +                    --pos;
@@ -16439,6 +16510,9 @@ index 0000000..026e76c
 +        for (int j = 0; j < K; ++j) {
 +            out[j] = top_i[j];
 +        }
++        for (int64_t j = K; j < k_used; ++j) {
++            out[j] = 0;
++        }
 +    }
 +}
 +
@@ -16448,8 +16522,10 @@ index 0000000..026e76c
 +    const MoeRouterWParams p = *static_cast<const MoeRouterWParams *>(userdata);
 +    const struct ggml_tensor * probs = dst->src[0];
 +    const struct ggml_tensor * ids   = dst->src[1];
++    const int64_t n_expert = probs->ne[0];
 +    const int64_t k_used   = dst->ne[1];
 +    const int64_t n_tokens = dst->ne[2];
++    const int64_t K        = std::min<int64_t>(k_used, 64);
 +
 +    const int64_t dt = (n_tokens + nth - 1) / nth;
 +    const int64_t t0 = dt * ith;
@@ -16462,8 +16538,9 @@ index 0000000..026e76c
 +
 +        float vals[64];
 +        float sum = 0.0f;
-+        for (int64_t j = 0; j < k_used; ++j) {
-+            const float w = pr[id[j]];
++        for (int64_t j = 0; j < K; ++j) {
++            const int32_t eid = id[j];
++            const float w = (eid >= 0 && eid < n_expert) ? pr[eid] : 0.0f;
 +            vals[j] = w;
 +            sum += w;
 +        }
@@ -16477,8 +16554,11 @@ index 0000000..026e76c
 +        if (p.w_scale != 0.0f && p.w_scale != 1.0f) {
 +            mul *= p.w_scale;
 +        }
-+        for (int64_t j = 0; j < k_used; ++j) {
++        for (int64_t j = 0; j < K; ++j) {
 +            out[j] = vals[j] * mul;
++        }
++        for (int64_t j = K; j < k_used; ++j) {
++            out[j] = 0.0f;
 +        }
 +    }
 +}
@@ -16852,7 +16932,7 @@ index 69ebe5a..f56b0a2 100644
              n_expert, hparams.n_expert_used(),
              LLM_FFN_SILU, hparams.expert_weights_norm,
 diff --git a/src/models/inkling2.cpp b/src/models/inkling2.cpp
-index 3e43ef4..104fcf1 100644
+index 3e43ef4..07f55aa 100644
 --- a/src/models/inkling2.cpp
 +++ b/src/models/inkling2.cpp
 @@ -1,5 +1,6 @@
@@ -16862,13 +16942,16 @@ index 3e43ef4..104fcf1 100644
  
  void llama_model_inkling2::load_arch_hparams(llama_model_loader & ml) {
      ml.get_key(LLM_KV_ATTENTION_LAYERNORM_RMS_EPS, hparams.f_norm_rms_eps);
-@@ -161,7 +162,34 @@ std::unique_ptr<llm_graph_context> llama_model_inkling2::build_arch_graph(const
+@@ -161,7 +162,37 @@ std::unique_ptr<llm_graph_context> llama_model_inkling2::build_arch_graph(const
  }
  
  // scale each row down to an L2 norm of at most threshold, after the optional per-channel scale
 -ggml_tensor * llama_model_inkling2::graph::clip(ggml_tensor * cur, ggml_tensor * scale, float threshold) {
 +ggml_tensor * llama_model_inkling2::graph::clip(ggml_tensor * cur, ggml_tensor * scale, float threshold, ggml_tensor * tau_mul) {
 +    if (layer_on_cpu && modchip_ink2::fusion_enabled(1) &&
++        modchip_ink2::tensor_on_cpu(cur) &&
++        modchip_ink2::tensor_on_cpu(scale) &&
++        modchip_ink2::tensor_on_cpu(tau_mul) &&
 +        cur->type == GGML_TYPE_F32 &&
 +        (!scale || scale->type == GGML_TYPE_F32) &&
 +        (!tau_mul || tau_mul->type == GGML_TYPE_F32)) {
@@ -16898,7 +16981,7 @@ index 3e43ef4..104fcf1 100644
      if (scale) {
          cur = ggml_mul(ctx0, cur, scale);
      }
-@@ -171,11 +199,47 @@ ggml_tensor * llama_model_inkling2::graph::clip(ggml_tensor * cur, ggml_tensor *
+@@ -171,11 +202,49 @@ ggml_tensor * llama_model_inkling2::graph::clip(ggml_tensor * cur, ggml_tensor *
  
      ggml_tensor * factor = ggml_div(ctx0, ggml_fill(ctx0, norm, threshold), norm);
  
@@ -16912,19 +16995,21 @@ index 3e43ef4..104fcf1 100644
  
  // attention over the depth: mix the earlier block outputs and cur with learned queries
  ggml_tensor * llama_model_inkling2::graph::mix(const std::vector<ggml_tensor *> & blocks, ggml_tensor * cur, ggml_tensor * query) {
-+    if (modchip_ink2::tensor_on_cpu(query) && modchip_ink2::fusion_enabled(2) &&
++    if (modchip_ink2::tensor_on_cpu(query) &&
++        modchip_ink2::tensor_on_cpu(cur) &&
++        modchip_ink2::fusion_enabled(2) &&
 +        cur->type == GGML_TYPE_F32 &&
 +        query->type == GGML_TYPE_F32 &&
 +        query->ne[1] <= 8 &&
-+        (int) blocks.size() + 2 <= GGML_MAX_SRC) {
-+        bool all_f32 = true;
++        (int) blocks.size() + 2 < GGML_MAX_SRC) {
++        bool all_ok = true;
 +        for (ggml_tensor * b : blocks) {
-+            if (b->type != GGML_TYPE_F32) {
-+                all_f32 = false;
++            if (!b || b->type != GGML_TYPE_F32 || !modchip_ink2::tensor_on_cpu(b)) {
++                all_ok = false;
 +                break;
 +            }
 +        }
-+        if (all_f32) {
++        if (all_ok) {
 +            ggml_tensor * args[GGML_MAX_SRC];
 +            args[0] = query;
 +            args[1] = cur;
@@ -16947,13 +17032,19 @@ index 3e43ef4..104fcf1 100644
      ggml_tensor * states = ggml_reshape_3d(ctx0, cur, n_embd, 1, n_tokens);
      for (ggml_tensor * block : blocks) {
          states = ggml_concat(ctx0, ggml_reshape_3d(ctx0, block, n_embd, 1, n_tokens), states, 1);
-@@ -212,6 +276,25 @@ ggml_tensor * llama_model_inkling2::graph::convolve(
+@@ -212,6 +281,31 @@ ggml_tensor * llama_model_inkling2::graph::convolve(
  
      build_conv_state_store(inp, state, x, n_conv - 1, offset*(n_conv - 1)*ggml_element_size(state));
  
 +    const float inv_sqrt = 1.0f / sqrtf((float) ((dynamic ? 2 : 1) * n_conv + 1));
 +
-+    if (modchip_ink2::tensor_on_cpu(weight) && modchip_ink2::fusion_enabled(3) &&
++    if (layer_on_cpu && modchip_ink2::fusion_enabled(3) &&
++        modchip_ink2::tensor_on_cpu(cur) &&
++        modchip_ink2::tensor_on_cpu(x) &&
++        modchip_ink2::tensor_on_cpu(weight) &&
++        modchip_ink2::tensor_on_cpu(dynamic) &&
++        modchip_ink2::tensor_on_cpu(state) &&
++        modchip_ink2::tensor_on_cpu(history) &&
 +        cur->type == GGML_TYPE_F32 &&
 +        x->type == GGML_TYPE_F32 &&
 +        weight->type == GGML_TYPE_F32 &&
@@ -16973,7 +17064,7 @@ index 3e43ef4..104fcf1 100644
      ggml_tensor * out = ggml_ssm_conv(ctx0, x, weight);
      out = ggml_reshape_2d(ctx0, out, n_channels, n_tokens);
  
-@@ -233,11 +316,37 @@ ggml_tensor * llama_model_inkling2::graph::convolve(
+@@ -233,11 +327,43 @@ ggml_tensor * llama_model_inkling2::graph::convolve(
          }
      }
  
@@ -16983,7 +17074,13 @@ index 3e43ef4..104fcf1 100644
  
  // mix a cross-pass message into a looped layer input: (1 - forget)*cur + gain*message, both gated on cur and message
  ggml_tensor * llama_model_inkling2::graph::control(ggml_tensor * cur, ggml_tensor * message, const loop_layer & loop, int ctrl) {
-+    if (modchip_ink2::tensor_on_cpu(loop.ctrl_down[ctrl]) && modchip_ink2::fusion_enabled(4) && cur->type == GGML_TYPE_F32 && message->type == GGML_TYPE_F32) {
++    if (layer_on_cpu && modchip_ink2::fusion_enabled(4) &&
++        modchip_ink2::tensor_on_cpu(cur) &&
++        modchip_ink2::tensor_on_cpu(message) &&
++        modchip_ink2::tensor_on_cpu(loop.ctrl_down[ctrl]) &&
++        modchip_ink2::tensor_on_cpu(loop.ctrl_gain[ctrl]) &&
++        modchip_ink2::tensor_on_cpu(loop.ctrl_forget[ctrl]) &&
++        cur->type == GGML_TYPE_F32 && message->type == GGML_TYPE_F32) {
 +        const int n_tasks_cat = modchip_ink2::choose_n_tasks(2 * n_embd * n_tokens, n_tokens);
 +        ggml_tensor * cat_args[2] = { cur, message };
 +        ggml_tensor * gate = ggml_custom_4d(
@@ -17012,12 +17109,15 @@ index 3e43ef4..104fcf1 100644
      ggml_tensor * gate = ggml_concat(ctx0, ggml_rms_norm(ctx0, cur, 1e-6f), ggml_rms_norm(ctx0, message, 1e-6f), 0);
      gate = build_lora_mm(loop.ctrl_down[ctrl], gate);
  
-@@ -247,6 +356,19 @@ ggml_tensor * llama_model_inkling2::graph::control(ggml_tensor * cur, ggml_tenso
+@@ -247,6 +373,22 @@ ggml_tensor * llama_model_inkling2::graph::control(ggml_tensor * cur, ggml_tenso
      return ggml_add(ctx0, ggml_sub(ctx0, cur, ggml_mul(ctx0, forget, cur)), ggml_mul(ctx0, gain, message));
  }
  
 +ggml_tensor * llama_model_inkling2::graph::norm_rms(ggml_tensor * cur, ggml_tensor * weight, int il) {
-+    if (modchip_ink2::tensor_on_cpu(weight) && modchip_ink2::fusion_enabled(8) && weight && cur->type == GGML_TYPE_F32 && weight->type == GGML_TYPE_F32) {
++    if (layer_on_cpu && weight && modchip_ink2::fusion_enabled(8) &&
++        modchip_ink2::tensor_on_cpu(cur) &&
++        modchip_ink2::tensor_on_cpu(weight) &&
++        cur->type == GGML_TYPE_F32 && weight->type == GGML_TYPE_F32) {
 +        const int64_t nrows = cur->ne[1] * cur->ne[2] * cur->ne[3];
 +        const int n_tasks   = modchip_ink2::choose_n_tasks(cur->ne[0] * nrows, nrows);
 +        return ggml_map_custom2(
@@ -17032,7 +17132,7 @@ index 3e43ef4..104fcf1 100644
  ggml_tensor * llama_model_inkling2::graph::build_inputs() {
      inp  = build_inp_mem_hybrid_iswa_rel(hparams.n_relative_extent, hparams.n_swa);
      attn = inp->get_attn();
-@@ -262,9 +384,11 @@ ggml_tensor * llama_model_inkling2::graph::build_inputs() {
+@@ -262,9 +404,11 @@ ggml_tensor * llama_model_inkling2::graph::build_inputs() {
  
      ggml_tensor * cur = build_inp_embd(model.tok_embd);
  
@@ -17045,7 +17145,7 @@ index 3e43ef4..104fcf1 100644
      }
  
      return cur;
-@@ -275,6 +399,7 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
+@@ -275,6 +419,7 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
      GGML_ASSERT(!messages == !loop);
  
      const auto & layer = model.layers[il];
@@ -17053,17 +17153,23 @@ index 3e43ef4..104fcf1 100644
  
      const bool    is_swa       = hparams.is_swa(il);
      const int64_t n_head       = hparams.n_head(il);
-@@ -284,7 +409,8 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
+@@ -284,7 +429,14 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
  
      // the message of controller ctrl, [n_embd, n_tokens]
      auto message = [&](int ctrl) {
 -        return ggml_cont(ctx0, ggml_view_2d(ctx0, messages, n_embd, n_tokens, messages->nb[2], ctrl*messages->nb[1]));
 +        ggml_tensor * v = ggml_view_2d(ctx0, messages, n_embd, n_tokens, messages->nb[2], ctrl*messages->nb[1]);
-+        return (layer_on_cpu && modchip_ink2::fusion_enabled(4)) ? v : ggml_cont(ctx0, v);
++        const bool can_fuse_ctrl = layer_on_cpu && modchip_ink2::fusion_enabled(4) &&
++            modchip_ink2::tensor_on_cpu(messages) &&
++            loop != nullptr &&
++            modchip_ink2::tensor_on_cpu(loop->ctrl_down[ctrl]) &&
++            modchip_ink2::tensor_on_cpu(loop->ctrl_gain[ctrl]) &&
++            modchip_ink2::tensor_on_cpu(loop->ctrl_forget[ctrl]);
++        return can_fuse_ctrl ? v : ggml_cont(ctx0, v);
      };
  
      ggml_tensor * state   = recr->mctx->get_r_l(il);
-@@ -311,35 +437,36 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
+@@ -311,35 +463,36 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
  
      if (is_swa && messages) {
          for (int j = 0; j < 3; ++j) {
@@ -17120,7 +17226,7 @@ index 3e43ef4..104fcf1 100644
  
          cb(Qcur, "Qcur", il);
          cb(Kcur, "Kcur", il);
-@@ -351,27 +478,53 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
+@@ -351,27 +504,61 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
          const int64_t n_stream = (is_swa ? attn->self_attn_mask_swa.raw : attn->self_attn_mask.raw)->ne[3];
          const int64_t n_kv     = rel_pos->ne[0];
  
@@ -17130,6 +17236,10 @@ index 3e43ef4..104fcf1 100644
 -        ggml_tensor * table = ggml_mul_mat(ctx0, ggml_pad(ctx0, layer.attn_rel_bias, 0, 1, 0, 0), Rcur);
 +        ggml_tensor * kq_b = nullptr;
 +        if (layer_on_cpu && modchip_ink2::fusion_enabled(5) &&
++            modchip_ink2::tensor_on_cpu(layer.attn_rel_bias) &&
++            modchip_ink2::tensor_on_cpu(Rcur) &&
++            modchip_ink2::tensor_on_cpu(sinks) &&
++            modchip_ink2::tensor_on_cpu(rel_pos) &&
 +            layer.attn_rel_bias->type == GGML_TYPE_F32 &&
 +            Rcur->type == GGML_TYPE_F32 &&
 +            sinks->type == GGML_TYPE_F32 &&
@@ -17176,7 +17286,11 @@ index 3e43ef4..104fcf1 100644
                  Qcur, Kcur, Vcur, kq_b, sinks, 1.0f/sqrtf(n_embd_head), il);
  
 -        cur = ggml_mul(ctx0, cur, ggml_sigmoid(ctx0, build_lora_mm(layer.wqkv_gate, inputs[0])));
-+        if (layer_on_cpu && modchip_ink2::fusion_enabled(6) && cur->type == GGML_TYPE_F32 && attn_gate->type == GGML_TYPE_F32) {
++        if (layer_on_cpu && modchip_ink2::fusion_enabled(6) &&
++            modchip_ink2::tensor_on_cpu(layer.wqkv_gate) &&
++            modchip_ink2::tensor_on_cpu(cur) &&
++            modchip_ink2::tensor_on_cpu(attn_gate) &&
++            cur->type == GGML_TYPE_F32 && attn_gate->type == GGML_TYPE_F32) {
 +            const int64_t nrows_g = cur->ne[1] * cur->ne[2] * cur->ne[3];
 +            const int n_tasks_g   = modchip_ink2::choose_n_tasks(cur->ne[0] * nrows_g, nrows_g);
 +            cur = ggml_map_custom2(ctx0, cur, attn_gate, modchip_ink2::fused_mul_sigmoid_op, n_tasks_g, nullptr);
@@ -17186,7 +17300,7 @@ index 3e43ef4..104fcf1 100644
          cur = convolve(build_lora_mm(layer.wo, cur), layer.attn_post_conv, nullptr, state, history, recr, 2*n_embd_k_gqa);
          cb(cur, "attn_out", il);
      }
-@@ -391,7 +544,7 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
+@@ -391,7 +578,7 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
      if (messages) {
          cur = control(cur, message(LOOP_CTRL_FFN), *loop, LOOP_CTRL_FFN);
      }
@@ -17195,7 +17309,7 @@ index 3e43ef4..104fcf1 100644
  
      cur = build_moe_ffn(cur,
              layer.ffn_gate_inp,
-@@ -421,8 +574,9 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
+@@ -421,8 +608,9 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
  }
  
  void llama_model_inkling2::graph::build_output(ggml_tensor * cur, const std::vector<ggml_tensor *> & blocks) {
@@ -17206,13 +17320,16 @@ index 3e43ef4..104fcf1 100644
  
      if (inp_out_ids) {
          cur = ggml_get_rows(ctx0, cur, inp_out_ids);
-@@ -435,14 +589,25 @@ void llama_model_inkling2::graph::build_output(ggml_tensor * cur, const std::vec
+@@ -435,14 +623,28 @@ void llama_model_inkling2::graph::build_output(ggml_tensor * cur, const std::vec
      cur = build_lora_mm(model.output, cur);
      ggml_prec_set_acc(cur, GGML_PREC_F32);
  
 -    if (hparams.f_final_logit_softcapping != 0.0f) {
 -        const float cap = hparams.f_final_logit_softcapping;
-+    if (layer_on_cpu && modchip_ink2::fusion_enabled(7) && cur->type == GGML_TYPE_F32) {
++    if (layer_on_cpu && modchip_ink2::fusion_enabled(7) &&
++        modchip_ink2::tensor_on_cpu(model.output) &&
++        modchip_ink2::tensor_on_cpu(cur) &&
++        cur->type == GGML_TYPE_F32) {
 +        ggml_tensor * out_args[1] = { cur };
 +        cur = ggml_custom_4d(
 +                ctx0, GGML_TYPE_F32,

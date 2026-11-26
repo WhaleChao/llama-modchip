@@ -1,9 +1,9 @@
-# `llama-modchip v3.2.0` 3-Tier Quality, Signal Precision & `RouteCrack 2.0` Parity Gate
+# `llama-modchip v3.2.1` 3-Tier Quality, Signal Precision & `RouteCrack 2.0` Parity Gate
 
-- **Release:** `v3.2.0` (Zero-Collision `ggml` ABI `41..45` · Unified `patches/llama-modchip-v3.2.patch` on `llama.cpp @ 46eb1742d` / `b12604`)
+- **Release:** `v3.2.1` (Zero-Collision `ggml` ABI `41..45` · Unified `patches/llama-modchip-v3.2.patch` on `llama.cpp @ 46eb1742d` / `b12604`)
 - **Target Flagship Fleet:**
   - **64 GB & 32 GB Tiers — `Qwen3.8-Flash-Next`** (`176.5B` total / `5B` active, `48` blocks: `36` Gated DeltaNet + `12` GQA + `512` routed experts + `320M`-row PLE + `blk.48` NextN MTP)
-  - **64 GB Tier (`284B`) — `DeepSeek-V4-Flash-0731-MaxQ-v4`** (`284.33B` total / `13.17B` active, `43` MLA + `256+1s` MoE layers, unpruned `Top-6`, 100% donor-free standard `ggml` tensor types; requires `llama-modchip v3.2.0+` loader for `ConeCollapse` `ffn_down_exps.bias`)
+  - **64 GB Tier (`284B`) — `DeepSeek-V4-Flash-0731-MaxQ-v4`** (`284.33B` total / `13.17B` active, `43` MLA + `256+1s` MoE layers, unpruned `Top-6`, 100% donor-free standard `ggml` tensor types; requires `llama-modchip v3.1.1+` loader for `ConeCollapse` `ffn_down_exps.bias`)
   - **16 GB Tier — `NVIDIA-Nemotron-3.5-Lightning-30B-A3B`** (`30.2B` total / `3.0B` active, `52` blocks: `23` Mamba-2 SSM + `23` Sparse MoE + `6` GQA Attention, unpruned `Top-6`; `VQ3-64` CPU-Turbo, `Fractal-64` Modchip Pro & `MaxQ-16GB` 100% unmodified-upstream `ggml`)
 - **Reference Testbed:** AMD Ryzen 9 9955HX (`16` Zen 5 cores, `64 MB` dual-CCD L3 cache, `74.0 GiB` Linux container RAM, DDR5-5600, Transparent HugePages `madvise`, `-t 15 -tb 15 --poll 0 --poll-batch 0`, `0 GPU`), with explicit Linux Cgroup v2 `MemorySwapMax=0` capacity enforcement (`60 GiB` for 64 GB tier, `28.5 GiB` for 32 GB tier, `15.0 GiB` for `MaxQ-16GB`).
 - **Evaluation Suites:**
@@ -14,9 +14,9 @@
 
 ---
 
-## 1. Zero-Collision `v3.2.0` `ggml` ABI & Format Signal Fidelity
+## 1. Zero-Collision `v3.2.1` `ggml` ABI & Format Signal Fidelity
 
-`llama-modchip v3.2.0` preserves all upstream `ggml` tensor types (`0..43`) untouched and places custom block-64 CPU/Metal quantization formats at dedicated zero-collision slots `44` and `45`:
+`llama-modchip v3.2.1` preserves all upstream `ggml` tensor types (`0..43`) untouched and places custom block-64 CPU/Metal quantization formats at dedicated zero-collision slots `44` and `45`:
 
 | `ggml` Enum ID | Symbol (`ggml.h`) | Effective `bpw` | Bytes / 64 W | Direct `BF16` SQNR | Cosine Sim vs. `BF16` | Backends |
 | :---: | :--- | :---: | :---: | :---: | :---: | :--- |
@@ -54,7 +54,8 @@ Verified across all three flagship families (`T = 0`, 16 Zen 5 cores, `0 GPU`, `
 - **Certified strictly below cap (`pgsteal = 0`, `workingset_refault = 0`):**
   - [`results/qwen38_64gb_cgroup60g_v311.json`](results/qwen38_64gb_cgroup60g_v311.json) (`60.0 GiB` cap): `N=1` **`8.78 ± 0.02`** (`46.53 GiB` cg.peak) vs `RC2` **`15.64 ± 0.05 tok/s`** (`W1 22.00 ± 0.19`, `48.35 GiB` cg.peak)
   - [`results/qwen38_32gb_cgroup28g_v311.json`](results/qwen38_32gb_cgroup28g_v311.json) (`28.5 GiB` cap): `N=1` **`10.00 ± 0.01`** (`26.79 GiB` cg.peak) vs `RC2` **`14.58 ± 0.32 tok/s`** (`W1 15.31`, `28.26 GiB` cg.peak — tight `0.24 GiB` headroom at 32K, `>10.5 GiB` PLE unfaulted)
-  - [`results/nemotron_16gb_cgroup15g_v311.json`](results/nemotron_16gb_cgroup15g_v311.json) (`15.0 GiB` cap, `N=1`): **`22.64 ± 0.03 tok/s`** (`~15.03 GiB` needed, `0.2 GiB` refault — nearly fits `15.0 GiB`; higher than earlier unpinned `-t 15 --poll 0` `15.10 t/s` `llama-bench` gate due to pinned `16C` `taskset` + `q8_0/q4_0` KV)
+- **Near-cap boundary (`~0.22 GiB` refault):**
+  - [`results/nemotron_16gb_cgroup15g_v311.json`](results/nemotron_16gb_cgroup15g_v311.json) (`15.0 GiB` cap, `N=1`): **`22.64 ± 0.03 tok/s`** (`~15.03 GiB` needed, `55,521–59,708` refaulted pages = `0.22 GiB` refault — borderline fit at `15.0 GiB`; higher than earlier unpinned `-t 15 --poll 0` `15.10 t/s` `llama-bench` gate due to pinned `16C` `taskset` + `q8_0/q4_0` KV)
 - **Exceeds cap at `-c 32768` (OOM-free via continuous host-ZFS-ARC-backed file reclaim; bare-metal throughput unverified):**
   - [`results/dsv4_64gb_cgroup60g_v311.json`](results/dsv4_64gb_cgroup60g_v311.json) (`60.0 GiB` cap): requires `~60.3–60.7 GiB` (`>= 61 GiB` free RAM for zero refaults); completes OOM-free via `10.7–30.7 GiB`/run ZFS-ARC-backed file reclaim (`8.88 ± 0.25` RC2 / `7.68 ± 0.01` N=1)
   - [`results/nemotron_16gb_cgroup15g_v311.json`](results/nemotron_16gb_cgroup15g_v311.json) (`15.0 GiB` cap, `RC2`): requires `~15.75 GiB` (`>= 16 GiB` free RAM for zero refaults); completes OOM-free via `8.4–9.2 GiB`/run ZFS-ARC-backed file reclaim (`26.28 ± 0.19`)
@@ -105,15 +106,15 @@ Built 100% donor-free from `deepseek-ai/DeepSeek-V4-Flash-0731` (`7872f01b1d1fe2
 
 ---
 
-## 6. Reproducibility Commands (`v3.2.0`)
+## 6. Reproducibility Commands (`v3.2.1`)
 
 ```bash
-# 1. Build unified llama-modchip v3.2.0 engine with quantizer & backend kernel tests
+# 1. Build unified llama-modchip v3.2.1 engine with quantizer & backend kernel tests
 BUILD_TESTS=1 ./scripts/build_zen5_llama.sh ./workspace/llama.cpp
 ./workspace/llama.cpp/build/bin/test-quantize-fns
 ./workspace/llama.cpp/build/bin/test-backend-ops test -b CPU
 
-# 2. Or download all prebuilt v3.2.0 Linux x86_64 binaries (including llama-perplexity & llama-bench)
+# 2. Or download all prebuilt v3.2.1 Linux x86_64 binaries (including llama-perplexity & llama-bench)
 ./modchip download-bin --all-tools
 
 # 3. Download & SHA-256 verify any 3-Tier checkpoint from Hugging Face

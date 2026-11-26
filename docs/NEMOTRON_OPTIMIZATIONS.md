@@ -28,7 +28,7 @@
 | **9. Weight Tile Repacking (`q4_0_8x8`)** | In-memory AVX-512 VNNI (`VPDPBUSD`) / AVX2 interleaved `8×8` matrix tile repacking at model load | Cache-line splits and nibble-unpacking stalls during GEMV/GEMM | **`+19%` raw GEMV throughput** and **`241–306.8 tok/s` (`pp512`) prefill** on 16C Zen 5 |
 | **10. KV Cache (`EAKV + VPI`)** | Entropy-Guided Asymmetric KV (`Q8_0` Keys for RoPE phase precision, `Q4_0` Values) + Virtual Positional Indexing | FP16 KV cache growth and RoPE degradation at `128K–256K` context | Full **`256K` context in `432 MB`**, `100%` passkey needle retrieval |
 | **11. Agentic Loop (`HARP-Cache` Slot-0)** | Per-UID `/dev/shm` memory-mapped KV + Mamba-2 recurrent state snapshot + SSE Gateway auto-restore | Re-evaluating Claude Code's `22.2K`-token 40-tool system prompt takes `130.8 s` on CPU | **`18.9 ms` warm turn restore** |
-| **12. Dynamic MoE Pruning (`Top-K 6->4`)** | Opt-in norm-preserving dynamic MoE router truncation (`LLAMA_MOE_TOP_K=4` environment variable at server startup) | Reading 6 routed experts per layer on bandwidth-constrained DDR4/DDR5 | **`-33%` routed MoE DRAM traffic** (opt-in boot-time setting; `v3.2.0` defaults to unpruned `Top-6`) |
+| **12. Dynamic MoE Pruning (`Top-K 6->4`)** | Opt-in norm-preserving dynamic MoE router truncation (`LLAMA_MOE_TOP_K=4` environment variable at server startup) | Reading 6 routed experts per layer on bandwidth-constrained DDR4/DDR5 | **`-33%` routed MoE DRAM traffic** (opt-in boot-time setting; `v3.2.1` defaults to unpruned `Top-6`) |
 
 ---
 
@@ -85,10 +85,10 @@ To measure quantization and abliteration fidelity directly against the uncompres
 
 ---
 
-## 4. Quick Commands for Nemotron (`v3.2.0`)
+## 4. Quick Commands for Nemotron (`v3.2.1`)
 
 ```bash
-# 1. Install & SHA-256 verify pre-quantized Nemotron v3.2.0 checkpoints from Hugging Face
+# 1. Install & SHA-256 verify pre-quantized Nemotron v3.2.1 checkpoints from Hugging Face
 ./install.sh --preset nemotron-vq3         # 13.30 GiB CPU-Turbo (types 44/45, AVX-512 VBMI + RouteCrack 2.0)
 ./install.sh --preset nemotron-maxq-16gb   # 13.39 GiB standard ggml <=42 (upstream llama.cpp & Q2_0-capable runners)
 ./install.sh --preset nemotron-fractal     # 14.36 GiB Fractal-64 (type 44, AVX2 / Apple Metal)

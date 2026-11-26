@@ -4,18 +4,18 @@
 
 ---
 
-## `v3.2.1` — Zero-Drift `Inkling-2-Mini` AVX-512 Graph Fusion (`+49.8%` Prefill / `+20.7%` Decode), Non-Temporal `mul_mat` Streaming (`LLAMA_NT_STREAM_MM=1`), & `11.3×` Batched HARP-Cache Acceleration
+## `v3.2.1` — Bounded-Error (`<1 ULP`) `Inkling-2-Mini` AVX-512 Graph Fusion (`+49.8%` Prefill / `+20.7%` Decode), Non-Temporal `mul_mat` Streaming (`LLAMA_NT_STREAM_MM=1`), & `11.3×` Batched HARP-Cache Acceleration
 
 **Release Date:** November 2026  
 **Highlights:**
-1. **Zero-Drift `Inkling-2-Mini` AVX-512 Graph Fusion (`src/llama-inkling2-fused.h`, `src/models/inkling2.cpp`, `src/llama-graph.cpp`, `MODCHIP_INK2_FUSE=1`)**:
-   - Collapses `~4,300+` per-token cross-CCD threadpool barriers and intermediate DRAM passes on looped `Inkling-2` / `Inkling-2-Mini` graphs at **`0.0000` PPL drift**: fused SiTU activation (`LLM_FFN_SITU`, 9 -> 1 node), L2 row clip + scale + log-tau (7–10 -> 1 node), depth-attention `mix()` (10–16 -> 1 node), shortconv + 4-lag dynamic taps + residual scale (3–23 -> 1 node), loop-control dual-RMS + mix (10 -> 2 nodes), gated attention `cur * sigmoid(g)` (2 -> 1 node), relative-bias gather `kq_b` (7 -> 1 node), final logit softcap + unpad (4 -> 1 node), and fused sigmoid MoE router top-k + weight normalization (7 -> 2 ops), plus Q8 activation cache projection grouping and `zero_sinks` reuse.
+1. **Bounded-Error (`<1 ULP`) `Inkling-2-Mini` AVX-512 Graph Fusion (`src/llama-inkling2-fused.h`, `src/models/inkling2.cpp`, `src/llama-graph.cpp`, `MODCHIP_INK2_FUSE=1`)**:
+   - Collapses `~4,300+` per-token cross-CCD threadpool barriers and intermediate DRAM passes on looped `Inkling-2` / `Inkling-2-Mini` graphs with **bounded-error (`<1 ULP`) AVX-512 approximations & empirically parity-verified output**: fused SiTU activation (`LLM_FFN_SITU`, 9 -> 1 node), L2 row clip + scale + log-tau (7–10 -> 1 node), depth-attention `mix()` (10–16 -> 1 node), shortconv + 4-lag dynamic taps + residual scale (3–23 -> 1 node), loop-control dual-RMS + mix (10 -> 2 nodes), gated attention `cur * sigmoid(g)` (2 -> 1 node), relative-bias gather `kq_b` (7 -> 1 node), final logit softcap + unpad (4 -> 1 node), and fused sigmoid MoE router top-k + weight normalization (7 -> 2 ops), plus Q8 activation cache projection grouping and `zero_sinks` reuse.
    - Uses runtime AVX-512F/DQ/FMA dispatch (`__builtin_cpu_supports`) with clean scalar fallback and compile-time `-DMODCHIP_INK2_DISABLE_AVX512` isolation on `-avx2` portable builds (`0` `%zmm` in `-avx2`).
-   - **Automatic GPU-Offload Safety (`modchip_ink2::tensor_on_cpu`):** Verifies tensors reside on `GGML_BACKEND_DEVICE_TYPE_CPU` (compatible with `--repack` / `CPU_REPACK`) before inserting CPU custom ops, ensuring zero GPU<->CPU sync stalls on Apple Silicon Metal, CUDA, and Vulkan offloaded runs.
-   - **Verified Zen 5 CPU Speedup (`MODCHIP_INK2_FUSE=1` + `LLAMA_NT_STREAM_MM=1`, `0.0000` PPL drift):** **`+49.8%`** prompt prefill and **`+20.7%`** decode throughput on `Inkling-2-Mini`.
-2. **Non-Temporal Decode Streaming for Large `mul_mat` Matrices (`ggml/src/ggml-cpu/ggml-cpu.c`, `LLAMA_NT_STREAM_MM=1`)**:
-   - Enables non-temporal (`_MM_HINT_NTA`) weight streaming on decode (`nr1 <= 4`) for large weight matrices (`>= 4 MiB`, e.g., `lm_head` and large `Q8_0` attention projections) so single-use weight sweeps never evict KV caches, conv states, or hot norms from L3 cache, and widens `nr0 >= 32768` decode chunking to `chunk_size = 512` (`LLAMA_NT_STREAM_MM=0` disables for A/B testing).
-   - Updated unified [`patches/llama-modchip-v3.2.patch`](patches/llama-modchip-v3.2.patch) cleanly onto `ggml-org/llama.cpp @ 46eb1742d` (`b12604`, `SHA256 = c6d1b07b5abd97388637fced26571cf0d4b0d9c3452e00b008d70732450eafd6`) — verified 156/156 `test-llama-archs` PASS (including `inkling2` & `inkling2_loop` at `0.00e+00` NMSE) and 3,059/3,059 `test-backend-ops` `MUL_MAT` PASS.
+   - **Automatic GPU-Offload Safety (`modchip_ink2::tensor_on_cpu`):** Verifies EVERY input/auxiliary tensor operand (`cur`, `scale`, `tau_mul`, `weight`, `blocks`, `attn_rel_bias`, `wqkv_gate`, `messages`, `probs_in`/`gate_inp`, `exp_probs_b`, `down_exps`, etc.) resides on `GGML_BACKEND_DEVICE_TYPE_CPU` (compatible with `--repack` / `CPU_REPACK`) before inserting CPU custom ops, ensuring zero GPU<->CPU sync stalls on Apple Silicon Metal, CUDA, and Vulkan offloaded runs, and gates fused sigmoid MoE routing exclusively to `inkling2*` when runtime MoE pruning env vars (`LLAMA_MOE_TOP_K`, `DSV4_MOE_CFG_PATH`, `DSV4_MOE_TOPK`, `DSV4_MOE_MIN_W`) are inactive.
+   - **Verified Zen 5 CPU Speedup (`MODCHIP_INK2_FUSE=1` + `LLAMA_NT_STREAM_MM=1`, empirically parity-verified):** **`+49.8%`** prompt prefill and **`+20.7%`** decode throughput on `Inkling-2-Mini`.
+2. **Non-Temporal Decode Streaming for Large `mul_mat` Matrices (`ggml/src/ggml-cpu/ggml-cpu.c`, `ggml/src/ggml-cpu/arch/x86/quants.c`, `LLAMA_NT_STREAM_MM=1`)**:
+   - Enables non-temporal (`_MM_HINT_NTA`) weight streaming on decode (`nr1 <= 4`) for large weight matrices (`>= 4 MiB`, e.g., `lm_head` and large `Q8_0` attention projections) gated uniformly across all quantized dot kernels (`ggml_cpu_nt_stream_active`) so `LLAMA_NT_STREAM_MM=0` cleanly disables NTA across all quants and multi-token prefill (`nr1 > 4`) never suffers cache eviction, and widens `nr0 >= 32768` decode chunking to `chunk_size = 512`.
+   - Updated unified [`patches/llama-modchip-v3.2.patch`](patches/llama-modchip-v3.2.patch) cleanly onto `ggml-org/llama.cpp @ 46eb1742d` (`b12604`, `SHA256 = 3cf7b16f8b38ee3dacab0626f7acba48019c574e9b680eeca58e3976a592b9f9`) — verified 156/156 `test-llama-archs` PASS (including `inkling2` & `inkling2_loop`) and 3,059/3,059 `test-backend-ops` `MUL_MAT` PASS.
 3. **Community Runtime, KV-Cache & Gateway Hardening (PRs `#51`, `#53`–`#61`)**:
    - **`11.3×` Faster Python HARP-Cache Hashing & O(1) Radix Eviction (`kv_cache/fnv_accel.py`, `kv_cache/harp_cache.py`, PRs `#56`, `#59`, `#61`):** Native + batched FNV-1a hashing, O(1) radix tree parent tracking, direct LRU scanning, struct packing, full radix-depth collision eviction, and anonymous fallback `close()` guard (`#51`).
    - **Vectorized EAKV Quantizer (`kv_cache/eakv_quantizer.py`, PR `#55`):** Vectorized RoPE rotation, batched `Q4_0` quantization, and LUT unpacking.
@@ -23,18 +23,18 @@
    - **Zero GGUF checkpoint changes** — all `v3.0` / `v3.1.1` / `v3.2.0` GGUF SHA-256s remain 100% identical.
 4. **12 Rebuilt Static-`libgomp` Portable `GLIBC_2.30` Linux `x86_64` Binaries, Tarball & Patch (`v3.2.1` `SHA256SUMS`)**:
    - Built on `ubuntu:20.04` (`gcc-10/g++-10`, `GLIBC <= 2.30`, static `libgomp.a` + `libstdc++.a` + `libgcc.a`, `0` `%zmm` in `-avx2`, `0` `vdpbf16ps` in `-avx512`, `0` dynamic `libgomp`/`libstdc++`/`libssl` dependencies):
-     - `c6d1b07b5abd97388637fced26571cf0d4b0d9c3452e00b008d70732450eafd6  llama-modchip-v3.2.patch`
-     - `72f88dccd6f8b067e8bddf0a8beb246d7e955c0a87da5e6d997f74089695c6a7  llama-server-modchip-linux-x86_64-avx512`
-     - `94e349d7cd70fcc7812ee02d7a323afff141e2ee604cb7c2f79c18ddf6136493  llama-server-modchip-linux-x86_64-avx2` *(and `llama-server-modchip-linux-x86_64`)*
-     - `377a62c728260f06cd9cb155d524831d36e29377d2f428855e160358851d4b41  llama-cli-modchip-linux-x86_64-avx512`
-     - `ae5cd7e0f684f89f5b0114f9ddf84779ede68345d46ca330e9cc3846a4805067  llama-cli-modchip-linux-x86_64-avx2` *(and `llama-cli-modchip-linux-x86_64`)*
-     - `309a515e4fba7832d6c47313dab7bc6ea06d9a1af1a39bf62c6e559f09993869  llama-bench-modchip-linux-x86_64-avx512`
-     - `a447f76f61a37c2a18763b3089eec109e94fc89126172f4fd5c1239ac20ce4f2  llama-bench-modchip-linux-x86_64-avx2`
-     - `9792b8594ac3cd355e0207abf3401567c879d45e4140755c40aecf4417af4761  llama-perplexity-modchip-linux-x86_64-avx512`
-     - `2d016b9583c41c77f2cb61366453432fe9818e47907f1066ab5a2a88f8762a5d  llama-perplexity-modchip-linux-x86_64-avx2`
-     - `8d809463e3d1e9a3c2bb2fcfd21b43b54765dce0e54d5559d9183dc7c702b828  llama-quantize-modchip-linux-x86_64-avx512`
-     - `5d4387a643047a4584592b5c4ad2ff9cbf8c2210013c88f1b1f49b292a8027d1  llama-quantize-modchip-linux-x86_64-avx2`
-     - `652dd445c4a3d47fa36f3e81e832d3a75b95429ded5e9c3ef676d26fbfa01dc0  llama-modchip-v3.2.1-linux-x86_64.tar.gz`
+     - `3cf7b16f8b38ee3dacab0626f7acba48019c574e9b680eeca58e3976a592b9f9  llama-modchip-v3.2.patch`
+     - `19361094462e0338506d3b2a52d55c36055e85b24bc39073fcc2546a94d3311f  llama-server-modchip-linux-x86_64-avx512`
+     - `8216b257491e133977565fb6f65abbe14dd29691b905c415ddfac3cfb5f04ba9  llama-server-modchip-linux-x86_64-avx2` *(and `llama-server-modchip-linux-x86_64`)*
+     - `46ef789e882af455d117b1b5f26f0bec34922412b84fe30fa50d52bf455a7ff3  llama-cli-modchip-linux-x86_64-avx512`
+     - `96f41af9a927d6dd5a941bf71f593261c54dda486730681555f025afcb6855f2  llama-cli-modchip-linux-x86_64-avx2` *(and `llama-cli-modchip-linux-x86_64`)*
+     - `d73d470c42c1269791f8b9cf57311760d32f683a68901735f343cf2e7b097e97  llama-bench-modchip-linux-x86_64-avx512`
+     - `ef973704b947994449bce914910b25ac921452eda85c37a0acd7b05a0b58fea4  llama-bench-modchip-linux-x86_64-avx2`
+     - `a8ba309b7682ead18fda1b742a67f8a92653830c37c1ca4cf1e35be9050128b1  llama-perplexity-modchip-linux-x86_64-avx512`
+     - `558819b5e349c887de8d4223919bbca0f97a2113779a0e826da8c19d8f618f5f  llama-perplexity-modchip-linux-x86_64-avx2`
+     - `c38db2b6da2ca810680d6f9dc38b488e4ef06c379d1c98dc93a4195f8d91015e  llama-quantize-modchip-linux-x86_64-avx512`
+     - `3a4a4fbbca25cd7540daaf9da9a4206b5667aaf31ad07fe05246f9172192aed1  llama-quantize-modchip-linux-x86_64-avx2`
+     - `fc5404aef608a3d9f01f8b04489eb0a537ae44777e63947b818f31cbe543a986  llama-modchip-v3.2.1-linux-x86_64.tar.gz`
 
 ---
 
@@ -60,7 +60,7 @@
      - **O(L/256) Chained Radix Slot Lookup + True LRU Eviction + Non-Destructive Shared-Prefix Preservation** (fixes the upstream `f_keep < 0.25` cliff for long shared prefixes `lcp >= 512`).
      - **Opt-In `/dev/shm` Persistent Slot Mirror (`LLAMA_MODCHIP_HARP_SHM=1` + `--slot-save-path`)**: `0600` permissions, anti-symlink `O_NOFOLLOW`, atomic `.tmp` -> rename writes, and 24-byte `harp_<fp>.idx` ancestor index.
    - **Verified Live `llama-server` Multi-Turn + Cold-Restart Benchmark (`8B Q4_K_M`, `-ctk q8_0 -ctv q4_0`, `LLAMA_MODCHIP_HARP_SHM=1`)**:
-     - Cold Turn 1: `14,468 ms` -> Multi-Branch Turn 2 (`cache_n = 1303`): **`1,285 ms` (`11.3×`)** -> Causal Divergence Turn 4: `cache_n = 0` (exact safety) -> **Cold Server Restart Turn 5 restored `1,302 / 1,319` tokens (`105.20 MiB`) from `/dev/shm` in `16.40 ms` (`6.41 GiB/s`, `1,351 ms` total TTFT, `10.7×` speedup)**.
+     - Cold Turn 1: `14,468 ms` -> Multi-Branch Turn 2 (`cache_n = 1303`): **`1,285 ms` (`11.3×`)** -> Causal Divergence Turn 4: `cache_n = 0` (exact safety) -> **Cold Server Restart Turn 5 restored `1,302 / 1,319` tokens (`105.20 MiB`) from `/dev/shm` in `16.40 ms` raw KV snapshot restore (`6.26 GiB/s`, `1,351 ms` total TTFT vs. `14.47 s` cold prefill, `10.7×` speedup)**.
    - **Zero GGUF checkpoint changes** — all `v3.0` / `v3.1.1` GGUF SHA-256s remain 100% identical.
 4. **12 Rebuilt Static-`libgomp` Portable `GLIBC_2.30` Linux `x86_64` Binaries, Tarball & Patch (`v3.2.0` `SHA256SUMS`)**:
    - Built on `ubuntu:20.04` (`gcc-10/g++-10`, `GLIBC <= 2.30`, static `libgomp.a` + `libstdc++.a` + `libgcc.a`, `0` `%zmm` in `-avx2`, `0` `vdpbf16ps` in `-avx512`, `0` dynamic `libgomp`/`libstdc++`/`libssl` dependencies):
@@ -192,7 +192,7 @@
      - **`MaxQ-32GB` (`draft-mtp`)**: `pp512` `61.39 ->` **`74.55 t/s` (`+21.5%`)**, `tg128` `9.455 ->` **`11.454 t/s` (`+21.1%` on `p512`, `14.29 t/s` avg / `14.77 t/s` peak on `inplace_edit`, `1.718×` over `v3.0 none` `6.668 t/s`, `VmHWM = 26.91 GiB <= 28.5 GiB`)**.
      - *(Transparent Attribution Note: Stage 4C ran oversubscribed `-t 16 --poll 50 --no-repack` on 16 vCPUs, whereas Stage 4D-1 ran `-t 15 -tb 15 --poll 0 --poll-batch 0` with `v3.0` default `--repack` ON; isolated non-convoy threading accounted for `+25.9% pp / +31.3% tg` on `32GB none`, and `./modchip` + `install.sh` now default `llama-server` to `-t $((N_CORES - 1)) -tb $((N_CORES - 1)) --poll 0 --poll-batch 0`.)*
    - **`248K` Speculative Shootout & `RC_TABLES_DIR=/nonexistent` Isolation**: Built-in `draft-mtp` won cold single-turn `rep 0` `tg128` on **`6 / 6` (`100%`)** of `(edition, prompt)` pairs; zero-weight `Stockfish-PVS v2` (`--spec-type ngram-simple --spec-ngram-simple-size-n 3 --spec-ngram-simple-size-m 3 --spec-ngram-simple-min-hits 1`) achieved **`10.58–12.82 t/s` (`1.67×–1.87×`)** on cold `rep 0` source-in-context refactoring with `+5.6%` to `+11.0%` faster prefill and `-0.53` to `-0.85 GiB` lower `VmHWM`. `./modchip` and `start_server.sh` automatically export `RC_TABLES_DIR=/nonexistent` whenever serving non-Nemotron models so `./workspace/routecrack` Nemotron tables are never loaded by mistake.
-   - **`/dev/shm` Hybrid State Save/Restore (`MaxQ-32GB`, `512` tok)**: Restores the `233.14 MiB` (`244,461,872 B`) `36 GDN + 12 GQA` state in **`38.49 ms` avg (`38.16 ms` min, `6.11 GiB/s`, `161.96×` faster than `6.18s` prefill; `~19 ms` / `120.6 MiB` with `--ctx-checkpoints 0`)** with 100% bit-exact continuation (`SHA256 = 8e5a6444...`).
+   - **`/dev/shm` Hybrid State Save/Restore (`MaxQ-32GB`, `512` tok)**: Restores the `233.14 MiB` (`244,461,872 B`) `36 GDN + 12 GQA` state in **`38.49 ms` avg (`38.16 ms` min, `5.92 GiB/s`, `161.96×` faster than `6.18s` prefill; `~19 ms` / `120.6 MiB` with `--ctx-checkpoints 0`)** with 100% bit-exact continuation (`SHA256 = 8e5a6444...`).
    - **Sampling & `<think>` Guidance**: `MaxQ-32GB` (`1.63 bpw`: `2/8` blind pass at greedy `temp=0`, `3/8` greedy repetition loops without penalties vs. `MaxQ-64GB` `5/8` pass [`5/5` within `4,096` cap, `0/8` loops]) defaults to `--temp 0.6 --top-p 0.95 --top-k 20 --presence-penalty 0.2 --repeat-penalty 1.05` in `./modchip`; when enabling `<think>` mode, set `max_tokens >= 16384` (or `enable_thinking=False` for `<= 4096` caps). Unpatched upstream `llama.cpp` users should pass `--no-repack` (`-nr`); not needed on `v3.0`.
 4. **12 Static-`libgomp` Portable `GLIBC_2.30` Linux `x86_64` Binaries (`SHA256SUMS`)**:
    - Links `libgomp.a`, `libstdc++.a`, and `libgcc.a` statically (`NEEDED = [libdl.so.2, libpthread.so.0, libm.so.6, libc.so.6, ld-linux-x86-64.so.2]`, `max_glibc <= 2.30`, `0` external OpenMP runtime needed) and removes internal weight-building scripts from the public runtime tree:

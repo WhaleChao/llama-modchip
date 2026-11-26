@@ -1286,7 +1286,7 @@ WEB_UI_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>llama-modchip v3.1.0 — MaxQ 16GB/32GB/64GB CPU + RouteCrack 2.0 HUD</title>
+<title>llama-modchip v3.2.1 — MaxQ 16GB/32GB/64GB CPU + RouteCrack 2.0 HUD</title>
 <style>
   :root {
     --bg: #0b0e14;
@@ -1476,7 +1476,7 @@ WEB_UI_HTML = """<!DOCTYPE html>
 <body>
 <header>
   <div class="brand">
-    <span>♟️ llama-modchip v3.1.0</span>
+    <span>♟️ llama-modchip v3.2.1</span>
     <span class="badge" id="status-badge">CONNECTING...</span>
   </div>
   <div style="font-family: var(--font-mono); font-size: 12px; color: var(--muted);" id="cpu-banner">
@@ -1521,7 +1521,7 @@ WEB_UI_HTML = """<!DOCTYPE html>
 </div>
 
 <main id="chat">
-  <div class="msg assistant">👋 <b>Welcome to the llama-modchip v3.1.0 Live Console!</b>
+  <div class="msg assistant">👋 <b>Welcome to the llama-modchip v3.2.1 Live Console!</b>
 Send any prompt below or click one of the <b>1-Click Benchmarks</b> above to watch real-time token streaming and measure your CPU's <b>Prefill tok/s</b>, <b>Decode tok/s</b>, and <b>RouteCrack 2.0 speculative acceptance</b>.</div>
 </main>
 
