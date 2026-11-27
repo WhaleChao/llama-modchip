@@ -1163,7 +1163,7 @@ def evaluate_dsv4_284b_readiness(cpu, mem, rep_30b):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Check CPU readiness & RAM headroom for llama-modchip v3.2.1 (Qwen3.8 64GB/32GB, DeepSeek-V4 284B MaxQ-v4, Nemotron-30B 16GB)"
+        description="Check CPU readiness & RAM headroom for llama-modchip v3.2.1 (Qwen3.8 64GB/32GB, DeepSeek-V4 284B MaxQ-v4, Nemotron-30B 16GB, Inkling-2-Mini Monza-RS v3)"
     )
     parser.add_argument(
         "--model",
@@ -1302,6 +1302,7 @@ def main():
     else:
         print(f"\n [4] RECOMMENDED LAUNCH FLAGS FOR THIS CPU (via llama_modchip.py, non-convoy -t {decode_threads} --poll 0)")
         print(f"  ./modchip setup --preset {rep_qwen['recommended_preset']}")
+        print(f"  ./modchip setup --preset monza   # Inkling-2-Mini Monza-RS v3 (26.07B Looped-MoE · 14.34 GiB · Apache 2.0)")
         print(f"  python3 scripts/llama_modchip.py --model /path/to/model.gguf --apply-shm --print-cmd")
         print(f"  export LLAMA_KV_L3_WINDOW=2048 LLAMA_ATTN_WINDOW=0 LLAMA_ATTN_SINKS=16 LLAMA_SWA_STRIDE=1 LLAMA_KV_DISABLE_CHUNKING=1 OMP_PROC_BIND=close OMP_PLACES=cores")
         print(f"  taskset -c {cpu['taskset_mask']} llama-server --model NVIDIA-Nemotron-3.5-30B-A3B-VQ3-64.gguf \\")

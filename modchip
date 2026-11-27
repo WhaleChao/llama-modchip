@@ -77,9 +77,11 @@ NEMOTRON_MAXQ_16GB_SHA256="26b884d70a52046a7198c4e01cac397af8bf44584b04cdcf59f89
 NEMOTRON_VQ3_SHA256="04a460cdd831002d80b2f47ec5d70e7a92227abcf0a57f31ad73fe0bd50e711f"
 NEMOTRON_FRACTAL_SHA256="3a3a09eac29b5906397ca6a93d2ff0f566fca0bdd365294d067aeb5d0ebf4a1b"
 NEMOTRON_ABLIT_SHA256="75da8372f3896bfacd103f3cb85bf22b729d39cb1efce82fb3c838ab2af53e57"
+MONZA_V3_SHA256="5f1df36927b56d761ede5359c1212d8443cee8330269062c0a0a3c96ed616038"
 VQ3_MODEL="${WORKSPACE_DIR}/models/NVIDIA-Nemotron-3.5-30B-A3B-VQ3-64.gguf"
 NEMO_MAXQ_16GB_MODEL="${WORKSPACE_DIR}/models/NVIDIA-Nemotron-3.5-30B-A3B-MaxQ-16GB.gguf"
 NEMOTRON_ABLIT_MODEL="${WORKSPACE_DIR}/models/NVIDIA-Nemotron-3.5-30B-A3B-Abliterated-VQ3-64.gguf"
+MONZA_V3_MODEL="${WORKSPACE_DIR}/models/Inkling-2-Mini-Monza-RS-v3-Ultimate.gguf"
 # Legacy v2.5.x local paths (withdrawn from Hugging Face Nov 2026; retained locally only for existing downloads)
 DSV4_MAXQ_MODEL="${WORKSPACE_DIR}/models/dsv4-maxq-fractal/DeepSeek-V4-Flash-0731-MaxQ-Fractal-00001-of-00003.gguf"
 DSV4_VQ3_MODEL="${WORKSPACE_DIR}/models/dsv4-vq3/DeepSeek-V4-Flash-0731-VQ3-00001-of-00003.gguf"
@@ -112,6 +114,8 @@ resolve_default_model() {
         printf '%s\n' "$NEMO_MAXQ_16GB_MODEL"
     elif [[ -f "$NEMOTRON_ABLIT_MODEL" ]]; then
         printf '%s\n' "$NEMOTRON_ABLIT_MODEL"
+    elif [[ -f "$MONZA_V3_MODEL" ]]; then
+        printf '%s\n' "$MONZA_V3_MODEL"
     elif [[ -f "$DSV4_MAXQ_MODEL" ]]; then
         printf '%s\n' "$DSV4_MAXQ_MODEL"
     elif [[ -f "$DSV4_VQ3_MODEL" ]]; then
@@ -615,6 +619,9 @@ cmd_claude() {
             model_id="NVIDIA-Nemotron-3.5-30B-A3B-Fractal-64"
             model_banner="NVIDIA-Nemotron-3.5-30B-A3B-Fractal-64 (30B-A3B Hybrid Mamba-2 · 256K CPU)"
         fi
+    elif [[ "$raw_model" == *[Ii]nkling* || "$raw_model" == *[Mm]onza* ]]; then
+        model_id="Inkling-2-Mini-Monza-RS-v3-Ultimate"
+        model_banner="Inkling-2-Mini Monza-RS v3 (26.07B / 128 experts · 14.34 GiB · AVX-512 Fusion + RouteCrack 2.0 · Apache 2.0)"
     elif [[ -n "$raw_model" ]]; then
         model_id="$(basename "$raw_model" .gguf | sed -E 's/-00001-of-[0-9]+$//')"
         model_banner="$model_id"
@@ -778,6 +785,8 @@ cmd_checksums() {
     printf '%s  %s\n' "$NEMOTRON_VQ3_SHA256" "NVIDIA-Nemotron-3.5-30B-A3B-VQ3-64.gguf (14,282,559,040 B · nemotron-vq3 · types 44/45)"
     printf '%s  %s\n' "$NEMOTRON_FRACTAL_SHA256" "NVIDIA-Nemotron-3.5-30B-A3B-Fractal-64.gguf (15,420,034,624 B · nemotron-fractal · type 44)"
     printf '%s  %s\n' "$NEMOTRON_ABLIT_SHA256" "NVIDIA-Nemotron-3.5-30B-A3B-Abliterated-VQ3-64.gguf (14,282,559,488 B · nemotron-ablit · types 44/45)"
+    echo "# Looped-MoE Reasoning — Inkling-2-Mini Monza-RS v3 (Apache 2.0)"
+    printf '%s  %s\n' "$MONZA_V3_SHA256" "Inkling-2-Mini-Monza-RS-v3-Ultimate.gguf (15,398,405,888 B · monza · 100% std ggml)"
     echo "# Portable llama-modchip v3.2.1 Linux x86_64 Binaries, Tarball & Patch (GLIBC <= 2.30)"
     printf '%s  %s\n' "23b45516877cb0e7acb87e6b9c1586e5d5b7e0b1e4b103ffa558c3fd36fa02c8" "patches/llama-modchip-v3.2.patch"
     printf '%s  %s\n' "6cc390594f9906b18866eb0d3af534fcb2d3fa486d8b7193aa93597c703886c7" "llama-server-modchip-linux-x86_64-avx512"

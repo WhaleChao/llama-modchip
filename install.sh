@@ -15,6 +15,7 @@
 #                            64 GB Tier: qwen38-64gb | qwen38-64gb-ablit | dsv4-maxq
 #                            32 GB Tier: qwen38-32gb | qwen38-32gb-ablit
 #                            16 GB Tier: nemotron-vq3 | nemotron-maxq-16gb | nemotron-ablit
+#                            Looped-MoE: monza (Inkling-2-Mini Monza-RS v3 · 14.34 GiB · Apache 2.0)
 #   --model <path>         Use an existing local GGUF file instead of downloading
 #   --skip-model           Install engine & scripts without downloading GGUF weights
 #   --prebuilt             Download CPU-matched Linux x86_64 v3.2.1 binary (-avx512 / -avx2)
@@ -154,7 +155,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -h|--help)
-            sed -n '2,27p' "$0"
+            sed -n '2,28p' "$0"
             exit 0
             ;;
         *)
@@ -340,9 +341,13 @@ if [[ "$MODEL_EXPLICIT" == "0" && -z "$MODEL_PRESET" ]]; then
         echo "     Universal 16GB (standard ggml <=42 — upstream llama.cpp & Q2_0-capable runners)"
         echo "  8) NVIDIA-Nemotron-3.5-30B-A3B-Abliterated-VQ3  [30B MoE · 13.30 GiB · Opt-In]"
         echo "     [OPT-IN UNCENSORED] 16GB VQ3-64 + RouteCrack 2.0 (refusal removed)"
+        echo ""
+        echo "  [16–32 GB LOOPED-MOE REASONING TIER]"
+        echo "  9) Inkling-2-Mini Monza-RS v3                   [26.07B / 128 experts · 14.34 GiB · Apache 2.0]"
+        echo "     100% std ggml · 227.43 pp512 / 13.87 tg128 t/s AVX-512 Fusion + RouteCrack 2.0"
         echo "------------------------------------------------------------------------------"
         while true; do
-            printf " Select model [1-8, Enter=%s]: " "$DEFAULT_MENU_CHOICE"
+            printf " Select model [1-9, Enter=%s]: " "$DEFAULT_MENU_CHOICE"
             read -r USER_MODEL_CHOICE < /dev/tty || USER_MODEL_CHOICE="$DEFAULT_MENU_CHOICE"
             USER_MODEL_CHOICE="${USER_MODEL_CHOICE:-$DEFAULT_MENU_CHOICE}"
             case "$USER_MODEL_CHOICE" in
@@ -354,8 +359,9 @@ if [[ "$MODEL_EXPLICIT" == "0" && -z "$MODEL_PRESET" ]]; then
                 6|nemotron-vq3)                          MODEL_PRESET="nemotron-vq3"; break ;;
                 7|nemotron-maxq-16gb|nemotron-16gb)      MODEL_PRESET="nemotron-maxq-16gb"; break ;;
                 8|nemotron-ablit|nemotron-abliterated)   MODEL_PRESET="nemotron-ablit"; break ;;
+                9|monza|inkling2-monza|inkling2)         MODEL_PRESET="monza"; break ;;
                 *)
-                    echo "[!] Unrecognized choice '${USER_MODEL_CHOICE}'. Please enter a number from 1 to 8."
+                    echo "[!] Unrecognized choice '${USER_MODEL_CHOICE}'. Please enter a number from 1 to 9."
                     ;;
             esac
         done
@@ -377,6 +383,8 @@ if [[ "$MODEL_EXPLICIT" == "1" ]]; then
         MODEL_FAMILY="qwen38"
     elif [[ "$MODEL_PATH" == *[Dd]eep[Ss]eek* || "$MODEL_PATH" == *dsv4* ]]; then
         MODEL_FAMILY="dsv4"
+    elif [[ "$MODEL_PATH" == *[Ii]nkling* || "$MODEL_PATH" == *[Mm]onza* ]]; then
+        MODEL_FAMILY="inkling2"
     fi
     if [[ "$MODEL_PATH" == *[Aa]bliterated* || "$MODEL_PATH" == *-ablit* ]]; then
         IS_ABLITERATED=1
@@ -503,6 +511,16 @@ else
             MODEL_SHARD_SIZES=(14282559488)
             MODEL_SHARD_SHA256S=("75da8372f3896bfacd103f3cb85bf22b729d39cb1efce82fb3c838ab2af53e57")
             ;;
+        9|monza|inkling2-monza|inkling2|Inkling-2-Mini-Monza-RS-v3)
+            MODEL_PRESET="monza"
+            MODEL_FAMILY="inkling2"
+            MODEL_LABEL="Inkling-2-Mini Monza-RS v3 (26.07B / 128 experts · 14.34 GiB · Apache 2.0 · 100% std ggml)"
+            MODEL_REPO="Synchopate/Inkling-2-Mini-Monza-RS-v3-GGUF"
+            MODEL_REV="7408782fc083d8c1a53c8a52be0cc3bfd9381990"
+            MODEL_SHARDS=("Inkling-2-Mini-Monza-RS-v3-Ultimate.gguf")
+            MODEL_SHARD_SIZES=(15398405888)
+            MODEL_SHARD_SHA256S=("5f1df36927b56d761ede5359c1212d8443cee8330269062c0a0a3c96ed616038")
+            ;;
         # Legacy v2.5.4 DeepSeek-V4 presets used pre-v3.0 custom tensor type IDs (42/43); redirect cleanly to dsv4-maxq (100% standard ggml)
         dsv4-maxq-fractal|dsv4-vq3|dsv4-fractal|dsv4-ablit|dsv4-abliterated)
             LEGACY_DSV4_PRESET="$MODEL_PRESET"
@@ -551,7 +569,7 @@ else
             ;;
         *)
             echo "[!] ERROR: Unknown --preset '${MODEL_PRESET}'." >&2
-            echo "    Valid v3.2.1 presets: qwen38-64gb, qwen38-64gb-ablit, dsv4-maxq, qwen38-32gb, qwen38-32gb-ablit, nemotron-vq3, nemotron-maxq-16gb, nemotron-ablit" >&2
+            echo "    Valid v3.2.1 presets: qwen38-64gb, qwen38-64gb-ablit, dsv4-maxq, qwen38-32gb, qwen38-32gb-ablit, nemotron-vq3, nemotron-maxq-16gb, nemotron-ablit, monza" >&2
             exit 1
             ;;
     esac
@@ -617,7 +635,7 @@ if [[ "$ENGINE_MODE_EXPLICIT" == "0" ]]; then
             echo " ENGINE INSTALLATION MODE (Linux x86_64 — CPUID matched: ${X86_PREBUILT_ASSET})"
             echo "------------------------------------------------------------------------------"
             echo "  1) Download precompiled v3.2.1 binary (${X86_PREBUILT_ASSET}) [Recommended, ~5s]"
-            echo "     Unified RouteCrack 2.0 binary serving Qwen3.8, DeepSeek-V4 284B & Nemotron-30B"
+            echo "     Unified RouteCrack 2.0 binary serving Qwen3.8, DeepSeek-V4 284B, Nemotron-30B & Inkling-2-Mini"
             echo "     (static libgomp/libstdc++, GLIBC <= 2.30; zero C++ compiler required)."
             echo "  2) Compile unified v3.2.1 engine from source"
             echo "     Applies patches/llama-modchip-v3.2.patch onto pinned llama.cpp."
@@ -886,6 +904,8 @@ elif [[ "$MODEL_FAMILY" == "qwen38" ]]; then
     echo "[+] RouteCrack 2.0 (--spec-type routecrack2: NextN MTP + Two-Zone Suffix + Stockfish-PVS + L1 Micro-Arbiter) ready (RC_TABLES_DIR=/nonexistent isolated)."
 elif [[ "$MODEL_FAMILY" == "dsv4" ]]; then
     echo "[+] RouteCrack 2.0 (--spec-type routecrack2: Heavy-MoE L1 Micro-Arbiter + Two-Zone Suffix + Stockfish-PVS) ready (RC_TABLES_DIR=/nonexistent isolated)."
+elif [[ "$MODEL_FAMILY" == "inkling2" ]]; then
+    echo "[+] RouteCrack 2.0 + Inkling-2 AVX-512 Fusion (MODCHIP_INK2_FUSE=1, MODCHIP_GEMM_TILE=1, LLAMA_NT_STREAM_MM=1) ready (RC_TABLES_DIR=/nonexistent isolated)."
 else
     echo "[+] RouteCrack 2.0 (--spec-type routecrack2: RCPredictor + Two-Zone Suffix + Stockfish-PVS + L1 Micro-Arbiter) ready."
 fi
@@ -894,7 +914,7 @@ echo ""
 echo "=============================================================================="
 echo " STEP 5/5: GENERATING AUTO-TUNED v3.2.1 LAUNCH SCRIPTS"
 echo "=============================================================================="
-if [[ "$MODEL_FAMILY" == "qwen38" ]]; then
+if [[ "$MODEL_FAMILY" == "qwen38" || "$MODEL_FAMILY" == "inkling2" ]]; then
     CTX_SIZE=32768
 elif [[ "$TOTAL_RAM_GB" -ge 30 ]]; then
     CTX_SIZE=262144
@@ -1044,6 +1064,7 @@ fi
 MODEL_EXTRA_ARGS=()
 SPEC_ARGS=()
 CKPT_ARGS=(--ctx-checkpoints 64 --checkpoint-min-step 128)
+DEFAULT_REASONING_BUDGET="0"
 
 if [[ "\${MODEL_ARCH:-}" == "qwen4exp" ]]; then
     CACHE_V_TYPE="q8_0"
@@ -1085,11 +1106,18 @@ elif [[ "\${MODEL_ARCH:-}" == "deepseek4" ]]; then
 elif [[ "\${MODEL_ARCH:-}" == inkling2* ]]; then
     CACHE_K_TYPE="f16"
     CACHE_V_TYPE="f16"
+    FLASH_ATTN_MODE="on"
+    DEFAULT_REASONING_BUDGET="-1"
+    [[ -z "\${MODCHIP_UBATCH_SIZE:-}" ]] && UBATCH_SIZE=512
     if [[ "${TOTAL_RAM_GB}" -le 18 ]]; then
-        [[ -z "\${MODCHIP_CTX_SIZE:-}" ]] && EFFECTIVE_CTX_SIZE=32768
-        [[ -z "\${MODCHIP_UBATCH_SIZE:-}" ]] && UBATCH_SIZE=512
+        [[ -z "\${MODCHIP_CTX_SIZE:-}" ]] && EFFECTIVE_CTX_SIZE=16384
         [[ -z "\${MODCHIP_SLOT_SAVE_PATH:-}" ]] && SLOT_SAVE_DIR="${WORKSPACE_DIR}/cache"
+    elif [[ "${TOTAL_RAM_GB}" -ge 48 ]]; then
+        [[ -z "\${MODCHIP_CTX_SIZE:-}" ]] && EFFECTIVE_CTX_SIZE=65536
+    else
+        [[ -z "\${MODCHIP_CTX_SIZE:-}" ]] && EFFECTIVE_CTX_SIZE=32768
     fi
+    MODEL_EXTRA_ARGS+=(--jinja --no-reasoning-preserve --temp 0.6 --top-p 0.95 --top-k 50 --repeat-penalty 1.03 --repeat-last-n 64 --dry-multiplier 0.4 --dry-base 1.75 --dry-allowed-length 10)
 else
     if [[ "${TOTAL_RAM_GB}" -le 18 ]]; then
         [[ -z "\${MODCHIP_CTX_SIZE:-}" ]] && EFFECTIVE_CTX_SIZE=32768
@@ -1171,7 +1199,7 @@ exec \${LAUNCH_PREFIX[@]+"\${LAUNCH_PREFIX[@]}"} "${WORKSPACE_DIR}/bin/llama-ser
   \${SPEC_ARGS[@]+"\${SPEC_ARGS[@]}"} \\
   \${MODEL_EXTRA_ARGS[@]+"\${MODEL_EXTRA_ARGS[@]}"} \\
   --reasoning-format "\${REASONING_FORMAT:-deepseek}" \\
-  --reasoning-budget "\${REASONING_BUDGET:-0}" \\
+  --reasoning-budget "\${REASONING_BUDGET:-\${DEFAULT_REASONING_BUDGET}}" \\
   \${EXTRA_ARGS_ARR[@]+"\${EXTRA_ARGS_ARR[@]}"} \\
   \${PASS_ARGS[@]+"\${PASS_ARGS[@]}"}
 EOF
