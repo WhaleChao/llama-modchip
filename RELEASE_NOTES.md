@@ -1,6 +1,46 @@
-# Release Notes — `llama-modchip` (`v3.2.1`)
+# Release Notes — `llama-modchip` (`v3.2.2`)
 
 > **Quick Links:** [Overview (`README.md`)](README.md) · [LUT-VQ3-64 & MaxQ-v4 Quality Gate (`benchmarks/QUALITY_GATE_VQ3_64.md`)](benchmarks/QUALITY_GATE_VQ3_64.md) · [Technical Architecture (`ARCHITECTURE.md`)](ARCHITECTURE.md) · [Windows Port & Hybrid Pack (`windows/README.md`)](windows/README.md) · [Fractal-MoE Quality Gate (`benchmarks/FRACTAL_MOE_QUALITY_GATE.md`)](benchmarks/FRACTAL_MOE_QUALITY_GATE.md) · [`RouteCrack 2.0` Techniques (`speculative/ROUTECRACK_TECHNIQUES.md`)](speculative/ROUTECRACK_TECHNIQUES.md) · [Engineering FAQ (`FAQ.md`)](FAQ.md)
+
+---
+
+## `v3.2.2` — Opt-In Apple `LoopCD` (`arXiv:2610.02185`) & Variable Loop Depth for `Inkling-2-Mini` (`+3.37 pp` Blind MC, `+8.70 pp` vs. Negative Placebo, `93.33%` Zero-Regression Generation Gate)
+
+**Release Date:** November 2026  
+**Highlights:**
+1. **Opt-In C++ Implementation of Apple `LoopCD` (`arXiv:2610.02185`) & Variable Loop Depth for `Inkling-2-Mini` (`src/models/inkling2-loop.cpp`, `src/models/models.h`, [`patches/llama-modchip-v3.2.patch`](patches/llama-modchip-v3.2.patch))**:
+   - **100% Opt-In / Zero Overhead When Unset (`MODCHIP_LOOPCD_MODE=off` default):** When unset, `llama-modchip v3.2.2` executes bit-identically to `v3.2.1` with zero extra loop cache slots and zero added compute.
+   - **Three Contrastive Loop Decoding Modes (Single-Env-Var Ergonomic Defaults + Per-Parameter Overrides):**
+     - `MODCHIP_LOOPCD_MODE=adaptive` *(Recommended opt-in, defaults `MODCHIP_LOOPCD_OMEGA=0.50`, `MODCHIP_LOOPCD_REF=0` [Pass 1])*: Implements `LoopCD-Logits` Adaptive Margin-Gated contrastive decoding (`Eq. 4`), applying `(1 + w_t) * z_R - w_t * z_r` where `w_t = omega * (1 - clamp(margin_R / (margin_R + margin_r + eps), 0, 1))`, boosting uncertain tokens while sparing confident predictions.
+     - `MODCHIP_LOOPCD_MODE=logits` *(defaults `omega=0.50`, `ref=0`)*: Implements `LoopCD-Logits` Fixed contrastive decoding (`Eq. 3`), `(1 + omega) * z_R - omega * z_r` before final logit softcapping.
+     - `MODCHIP_LOOPCD_MODE=hidden` *(defaults `omega=0.40`, `ref=1` [Pass 2])*: Implements `LoopCD-Hidden` (`Eq. 2`), extrapolating final pre-`lm_head` hidden states `h_final = (1 + omega) * h_R - omega * h_r` at **`0.0%` decode speed overhead** (`11.61` vs `11.24 tok/s`).
+     - `MODCHIP_INK2_LOOPS=1..6` *(default: checkpoint native `n_loop` = `3`)*: Runtime loop-depth selector for research and variable-depth evaluation (`R=2` yields `+33.8%` raw speed at `15.04 tok/s` but incurs high PPL on unmodified `R=3`-trained weights).
+   - **Cross-Backend Safety & Numerical Hardening:** Uses `llama-modchip`'s fused AVX-512 `lm_head` path on plain CPU tensors and automatically falls back to pure `ggml` graph ops (`ggml_mul_mat` + `ggml_add`/`ggml_scale`) whenever `model.output` resides on a non-CPU backend (Apple Metal, CUDA, Vulkan) or is repacked, with finite/`NaN` guards on `omega` and margin gating.
+2. **Verified Causal & Generation Safety Benchmarks on `Inkling-2-Mini Monza-RS v3` (`14.34 GiB`, 0 GPU Zen 5, [`JSON`](benchmarks/results/inkling2_monza_v3_loopcd_v322.json))**:
+   - **563 Blind Multiple-Choice Tasks (`WinoGrande 199 + ARC-Challenge 150 + MMLU 114 + HellaSwag 100`):**
+     - `base_R3` (`off`): **`68.21%`** (`384/563`, macro `67.96%` — `Wino 71.86`, `ARC 67.33`, `MMLU 52.63`, `Hella 80.00`).
+     - `MODCHIP_LOOPCD_MODE=hidden` (`omega=0.40, ref=1`, `0.0%` speed cost): **`69.27%`** (`390/563`, `+1.07 pp`, `+10/-4`, `p = 0.18`, zero suite regressions).
+     - `MODCHIP_LOOPCD_MODE=logits` (`omega=0.50, ref=0`, `-5.1%` raw decode cost): **`71.23%`** (`401/563`, `+3.02 pp`, `+32/-15`, two-sided McNemar `p = 0.0186`, lifts all 4 suites).
+     - `MODCHIP_LOOPCD_MODE=adaptive` (`omega=1.00, ref=0`, `-5.1%` raw decode cost: `10.67` vs `11.24 tok/s` at `-t 12`): **`71.58%`** (`403/563`, **`+3.37 pp`**, `+43/-24`, McNemar **`p = 0.0271`** — `Wino 75.38`, `ARC 72.67`, `MMLU 55.26`, `Hella 81.00`).
+     - **Negative-Omega Falsification Placebo (`mode=logits omega=-0.50 ref=0`):** Crashes all 4 suites to **`62.88%`** (`354/563`, `-5.33 pp` vs. base, `+13/-43`, `p = 7.33e-5`), certifying **`+8.70 pp`** pure directional causal separation (`adaptive` vs. negative placebo, `+86/-37`, `p = 1.17e-5`).
+   - **60 Deterministic Autoregressive Generation Safety Tasks (`IFEval-Strict 20 + HumanEval+ 20 + Italian Enterprise 20`, `T=0, max_tokens=2048`):**
+     - `base_R3` (`off`): **`91.67%`** (`55/60` — `IFEval 80%`, `HumanEval+ 95%`, `Italian Enterprise 100%`, `1,372` mean thinking chars).
+     - **`MODCHIP_LOOPCD_MODE=adaptive`** *(production default `omega=0.50, ref=0`)*: **`93.33%`** (`56/60`, **`+1/-0` zero regressions** — `IFEval 85% [+5 pp]`, `HumanEval+ 95%`, `Italian Enterprise 100%` with `0` truncations and `-5.2%` thinking chars [`1,300`]). Kept **opt-in (OFF by default)** because standard `R=3` remains slightly faster (`+5.3%`) and more natural on open-ended creative prose.
+   - **Zero GGUF checkpoint changes** — `Inkling-2-Mini-Monza-RS-v3-Ultimate.gguf` (`5f1df369...`) and all `v3.0`/`v3.1.1`/`v3.2.1` GGUF SHA-256s remain 100% identical.
+3. **12 Rebuilt Static-`libgomp` Portable `GLIBC_2.30` Linux `x86_64` Binaries, Tarball & Patch (`v3.2.2` `SHA256SUMS`)**:
+   - Built on `ubuntu:20.04` (`gcc-10/g++-10`, `GLIBC <= 2.30`, static `libgomp.a` + `libstdc++.a` + `libgcc.a`, `0` `%zmm` in `-avx2`, `0` `vdpbf16ps` in `-avx512`, `0` dynamic `libgomp`/`libstdc++`/`libssl` dependencies; cleanly applies to `ggml-org/llama.cpp @ 46eb1742d` / `b12604`):
+     - `fa74822e6d4ac9bd5460eda34d5908753128585ae2236bb29f7a14fef79d002c  llama-modchip-v3.2.patch`
+     - `c673cad9e7aa45e2351e92247ebf9791a934b835cf6a1f3e9c7e46f27b25bdc6  llama-server-modchip-linux-x86_64-avx512`
+     - `9465fa9c21eabf8b843997e95537b5b545313e8181b25cbfd3a6449549b827d8  llama-server-modchip-linux-x86_64-avx2` *(and `llama-server-modchip-linux-x86_64`)*
+     - `cd949bf1785b747952a802007195db6b927f46fbff2f126743787d064250db79  llama-cli-modchip-linux-x86_64-avx512`
+     - `ff13d9fa32a3ba6502aedacad2ccf2598d18312ccbe6de8cb9cde3a5d5bb7301  llama-cli-modchip-linux-x86_64-avx2` *(and `llama-cli-modchip-linux-x86_64`)*
+     - `fd6a9624417921b20c363e6958807fe16e222fd37fd8d3d53eda5c49a29c67c2  llama-bench-modchip-linux-x86_64-avx512`
+     - `7a5b5146638954e7a5206fb7398fa298cd7ca890ac5f04a14d9dabb022241c19  llama-bench-modchip-linux-x86_64-avx2`
+     - `19f35504b91a392ad5682426737d1567e9fa13c33b19ce3662aa1f556932f08b  llama-perplexity-modchip-linux-x86_64-avx512`
+     - `2262daade88e4269bec9ed2dc8be1e735490833c903bf7612c8b7f880069667d  llama-perplexity-modchip-linux-x86_64-avx2`
+     - `f34d3f046513d535d392dfaa6a44a2045a69abbfc945a71c4a5ee524bd2c3a43  llama-quantize-modchip-linux-x86_64-avx512`
+     - `b33bd3da311ec61daea7e8f626e2108642e9d077d40bdc36b685efa0942eb1ac  llama-quantize-modchip-linux-x86_64-avx2`
+     - `7ce80d0109e8d580833bfe3c7988f0c8402774ad91b2212a6f67de76b547f228  llama-modchip-v3.2.2-linux-x86_64.tar.gz`
 
 ---
 

@@ -1,20 +1,20 @@
 <div align="center">
 
-# llama-modchip (v3.2.1)
+# llama-modchip (v3.2.2)
 
 ### Unified 16 GB · 32 GB · 64 GB MaxQ Inference Engine for `Qwen3.8-Flash-Next`, `DeepSeek-V4 284B`, `Nemotron-3.5 30B` & `Inkling-2-Mini`
-**Single-Pass `MaxQ` Compression · Unified `RouteCrack 2.0` (`L1 Micro-Arbiter`) · Bounded-Error `Inkling-2` AVX-512 Fusion · Quantized Split-KV Decode · Native C++ HARP-Cache v2 · Zero-Collision ABI · Linux, macOS Metal, CUDA, Vulkan & Windows 11**
+**Single-Pass `MaxQ` Compression · Unified `RouteCrack 2.0` (`L1 Micro-Arbiter`) · Bounded-Error `Inkling-2` AVX-512 Fusion + Opt-In Apple `LoopCD` · Quantized Split-KV Decode · Native C++ HARP-Cache v2 · Zero-Collision ABI · Linux, macOS Metal, CUDA, Vulkan & Windows 11**
 
-[![Release](https://img.shields.io/badge/release-v3.2.1-3fb950?style=flat-square)](RELEASE_NOTES.md)
+[![Release](https://img.shields.io/badge/release-v3.2.2-3fb950?style=flat-square)](RELEASE_NOTES.md)
 [![License](https://img.shields.io/badge/license-Apache%202.0-58a6ff?style=flat-square)](LICENSE)
 [![Quality Gate](https://img.shields.io/badge/blind%20wiki--alt%20PPL-3.43%20(64GB)%20%C2%B7%206.86%20(284B)%20%C2%B7%20100%2F100%20(30B)-2ea043?style=flat-square)](benchmarks/QUALITY_GATE_VQ3_64.md)
-[![Technical Paper PDF](https://img.shields.io/badge/PDF-v3.2.1%20technical%20paper-b31b1b?style=flat-square)](paper/llama-modchip-paper.pdf)
+[![Technical Paper PDF](https://img.shields.io/badge/PDF-v3.2.2%20technical%20paper-b31b1b?style=flat-square)](paper/llama-modchip-paper.pdf)
 [![Architecture](https://img.shields.io/badge/docs-ARCHITECTURE.md-bc8cff?style=flat-square)](ARCHITECTURE.md)
 [![Drafter](https://img.shields.io/badge/drafter-RouteCrack%202.0%20(L1%20Micro--Arbiter)-d29922?style=flat-square)](speculative/ROUTECRACK_TECHNIQUES.md)
-[![HF Collection](https://img.shields.io/badge/Hugging%20Face-MaxQ%20v3.2.1%20Fleet-ffcc00?style=flat-square)](https://huggingface.co/collections/Synchopate/maxq-zero-gpu-frontier-fleet-v311-6afb6e2d63dfd573b4b1a95f)
+[![HF Collection](https://img.shields.io/badge/Hugging%20Face-MaxQ%20v3.2.2%20Fleet-ffcc00?style=flat-square)](https://huggingface.co/collections/Synchopate/maxq-zero-gpu-frontier-fleet-v311-6afb6e2d63dfd573b4b1a95f)
 [![Submit Benchmark](https://img.shields.io/badge/leaderboard-Submit%20Your%20CPU-2ea043?style=flat-square)](https://github.com/synchopate/llama-modchip/issues/new?template=cpu_benchmark_submission.yml)
 
-[**Quickstart (`./modchip setup`)**](#quickstart) · [**3-Tier RAM Matrix**](#the-3-tier-maxq-v321-ram-matrix) · [**`RouteCrack 2.0` & Fidelity Benchmarks**](#empirical-signal-fidelity-and-end-to-end-benchmarks) · [**Engine Architecture (`v3.2.1`)**](#what-is-new-in-llama-modchip-v321) · [**Supported Hardware**](#supported-chips-and-processor-specific-optimizations) · [**Leaderboard**](#community-cpu-and-hybrid-leaderboard) · [**FAQ**](FAQ.md)
+[**Quickstart (`./modchip setup`)**](#quickstart) · [**3-Tier RAM Matrix**](#the-3-tier-maxq-v322-ram-matrix) · [**`RouteCrack 2.0` & Fidelity Benchmarks**](#empirical-signal-fidelity-and-end-to-end-benchmarks) · [**Engine Architecture (`v3.2.2`)**](#what-is-new-in-llama-modchip-v322) · [**Supported Hardware**](#supported-chips-and-processor-specific-optimizations) · [**Leaderboard**](#community-cpu-and-hybrid-leaderboard) · [**FAQ**](FAQ.md)
 
 <table>
 <tr>
@@ -35,17 +35,17 @@
 
 ---
 
-## The 3-Tier `MaxQ v3.2.1` RAM Matrix
+## The 3-Tier `MaxQ v3.2.2` RAM Matrix
 
-One unified `llama-modchip v3.2.1` binary (`GLIBC <= 2.30`, static `libstdc++` & `libgomp`, zero external OpenMP `.so` needed, rebased onto `llama.cpp @ 46eb1742d` / `b12604`) automatically detects your CPU ISA (`AVX-512 VBMI/VNNI`, `AVX2`, `ARM64 NEON`, `Apple Metal`), system RAM, and model family (`MTP` vs `30B` Mamba-2 vs `284B` Heavy-MoE vs `Inkling-2-Mini`) to run **`RouteCrack 2.0` (`--spec-type routecrack2`)** with **Bounded-Error (`<1 ULP`) `Inkling-2` AVX-512 Fusion**, **Quantized Split-KV Decode**, and **Native C++ Chained-Prefix HARP-Cache v2** on the strongest open-weights model that fits cleanly on your machine:
+One unified `llama-modchip v3.2.2` binary (`GLIBC <= 2.30`, static `libstdc++` & `libgomp`, zero external OpenMP `.so` needed, rebased onto `llama.cpp @ 46eb1742d` / `b12604`) automatically detects your CPU ISA (`AVX-512 VBMI/VNNI`, `AVX2`, `ARM64 NEON`, `Apple Metal`), system RAM, and model family (`MTP` vs `30B` Mamba-2 vs `284B` Heavy-MoE vs `Inkling-2-Mini`) to run **`RouteCrack 2.0` (`--spec-type routecrack2`)** with **Bounded-Error (`<1 ULP`) `Inkling-2` AVX-512 Fusion + Opt-In Apple `LoopCD`**, **Quantized Split-KV Decode**, and **Native C++ Chained-Prefix HARP-Cache v2** on the strongest open-weights model that fits cleanly on your machine:
 
-| System RAM Tier | Recommended Aligned Checkpoint | Disk Footprint (`Shards`) | Cold-Cache Cgroup v2 (`-c 32768`, `Swap=0`) | Verified Speed (`16C Zen 5`, `0 GPU`, `v3.1.1`/`v3.2.1`) | Backend Compatibility |
+| System RAM Tier | Recommended Aligned Checkpoint | Disk Footprint (`Shards`) | Cold-Cache Cgroup v2 (`-c 32768`, `Swap=0`) | Verified Speed (`16C Zen 5`, `0 GPU`, `v3.1.1`/`v3.2.2`) | Backend Compatibility |
 | :---: | :--- | :---: | :---: | :---: | :--- |
-| **`64 GB` Tier**<br/>*(Flagship Default)* | **[`Qwen3.8-Flash-Next-MaxQ-64GB`](https://huggingface.co/Synchopate/Qwen3.8-Flash-Next-MaxQ-64GB-GGUF)**<br/>*(`--preset qwen38-64gb` · `512/512` unpruned experts + `blk.48` MTP)* | **`53.99 GiB`** (`57,969,748,352 B`)<br/>*(`43.26` Trunk + `10.73` PLE)* | **`48.35 GiB <= 60.0 GiB`**<br/>*(`pgsteal=0`, `Swap=0`, [`JSON`](benchmarks/results/qwen38_64gb_cgroup60g_v311.json))* | **`15.64 ± 0.05 agg / 22.00 W1`** *(cold 60G cg, `n=3`)*<br/>*(`15.34 / 21.38` uncapped H2H)* | **Standard `ggml` (`types <= 42`, `0` ConeCollapse bias)**: pass `--no-repack` on unpatched upstream `llama.cpp`; `llama-modchip v3.2.1` recommended for zero-copy 3D MoE `--repack` & `RouteCrack 2.0` |
+| **`64 GB` Tier**<br/>*(Flagship Default)* | **[`Qwen3.8-Flash-Next-MaxQ-64GB`](https://huggingface.co/Synchopate/Qwen3.8-Flash-Next-MaxQ-64GB-GGUF)**<br/>*(`--preset qwen38-64gb` · `512/512` unpruned experts + `blk.48` MTP)* | **`53.99 GiB`** (`57,969,748,352 B`)<br/>*(`43.26` Trunk + `10.73` PLE)* | **`48.35 GiB <= 60.0 GiB`**<br/>*(`pgsteal=0`, `Swap=0`, [`JSON`](benchmarks/results/qwen38_64gb_cgroup60g_v311.json))* | **`15.64 ± 0.05 agg / 22.00 W1`** *(cold 60G cg, `n=3`)*<br/>*(`15.34 / 21.38` uncapped H2H)* | **Standard `ggml` (`types <= 42`, `0` ConeCollapse bias)**: pass `--no-repack` on unpatched upstream `llama.cpp`; `llama-modchip v3.2.2` recommended for zero-copy 3D MoE `--repack` & `RouteCrack 2.0` |
 | **`64 GB` Tier**<br/>*(`284B` Alternative)* | **[`DeepSeek-V4-Flash-0731-MaxQ-v4`](https://huggingface.co/Synchopate/DeepSeek-V4-Flash-0731-MaxQ-v4-64GB-CPU-GGUF)**<br/>*(`--preset dsv4-maxq` · `284.3B` Total / `13.2B` Active)* | **`57.99 GiB`** (`62,270,037,248 B`)<br/>*(`3` shards, `34L` ConeCollapse)* | **`~60.5 GiB` WS** *(needs `>= 61 GiB` free; `60G` cg OOM-free via ARC reclaim, [`JSON`](benchmarks/results/dsv4_64gb_cgroup60g_v311.json))* | **`45.0–50.5 t/s` `pp`**<br/>**`7.79 agg / 12.31 W1 t/s`** *(uncapped `74G` host)* | **Standard `ggml` tensor types (`0` custom types)** for CPU, Metal, CUDA, Vulkan — **requires `llama-modchip v3.1.1+` loader** for `34×` ConeCollapse `ffn_down_exps.bias` |
 | **`32 GB` Tier**<br/>*(Consumer Default)* | **[`Qwen3.8-Flash-Next-MaxQ-32GB`](https://huggingface.co/Synchopate/Qwen3.8-Flash-Next-MaxQ-32GB-GGUF)**<br/>*(`--preset qwen38-32gb` · `42L` ConeCollapse `K=640->512` + `blk.48` MTP)* | **`35.71 GiB`** (`38,341,683,424 B`)<br/>*(`24.98` RAM + `10.73` lazy NVMe PLE)* | **`28.26 GiB <= 28.5 GiB`** *(cold cg, `0.24 GiB` headroom at 32K, `pgsteal=0`, `>10.5 GiB` PLE unfaulted, [`JSON`](benchmarks/results/qwen38_32gb_cgroup28g_v311.json))* | **`14.58 ± 0.32 agg / 15.31 W1`** *(cold 28.5G cg, `n=3`)*<br/>*(`10.00 ± 0.01` `N=1`)* | **Standard `ggml` tensor types (`types <= 42`)** + NVMe `mmap` demand-paged PLE — **requires `llama-modchip v3.1.1+` loader** for `42×` ConeCollapse `ffn_down_exps.bias` |
 | **`16 GB` Tier**<br/>*(Two-Track: Universal + Modchip)* | **[`Nemotron-3.5-30B-A3B-MaxQ-16GB`](https://huggingface.co/Synchopate/NVIDIA-Nemotron-3.5-30B-A3B-MaxQ-16GB-GGUF)** *(Universal Std `ggml`)*<br/>**[`Nemotron-3.5-30B-A3B-Fractal-64`](https://huggingface.co/Synchopate/NVIDIA-Nemotron-3.5-30B-A3B-Fractal-64-CPU-GGUF)** *(Modchip Pro, `0` `Q2_0`)*<br/>**[`Nemotron-3.5-30B-A3B-VQ3-64`](https://huggingface.co/Synchopate/NVIDIA-Nemotron-3.5-30B-A3B-VQ3-64-CPU-GGUF)** *(Modchip CPU-Turbo)* | **`13.39 / 14.36 / 13.30 GiB`**<br/>*(`1` file, `256K` Mamba-2+MoE)* | `MaxQ-16GB`: **`~15.0G` `N=1`** (`0.22 GiB` refault) / **`~15.8G` `RC2`** ([`JSON`](benchmarks/results/nemotron_16gb_cgroup15g_v311.json))<br/>`15.4–17.3` (`Fractal-64`) / `14.6–16.04` (`VQ3-64`, `16–24 GB`) | `MaxQ-16GB` (`15G` cg `N=1`): **`22.64 ± 0.03 t/s`** *(RC2 `26.28` ARC-reclaim)*<br/>`Fractal-MXFP4` ref H2H: **`28.20 agg / 42.18 W1 t/s`** | `MaxQ-16GB`: **Standard `ggml <= 42` (`0` custom types, `0` bias)** — unmodified upstream `llama.cpp` (`de32b268c+`) & `Q2_0`-capable runners<br/>`Fractal-64` / `VQ3-64`: **`llama-modchip v3.1.1+`** (`types 44/45`) |
-| **`16–32 GB` Tier**<br/>*(Looped-MoE Reasoning)* | **[`Inkling-2-Mini Monza-RS v3`](https://huggingface.co/Synchopate/Inkling-2-Mini-Monza-RS-v3-GGUF)**<br/>*(`--preset monza` · `26.07B` / `128` experts · Apache 2.0)* | **`14.34 GiB`** (`15,398,405,888 B`, `1` file) | *Not yet cgroup-certified* (`24 GB` Mac / `32 GB` PC / `16 GB` GPU short ctx) | **`227.43` `pp512` / `13.29` `tg128` t/s**<br/>*(`13.87` `tg128` at `-t 8` `MODCHIP_PIN_CORES=1`; `+144.6% / +27.8%` vs `92.98 / 10.40`, [`JSON`](benchmarks/results/inkling2_monza_v3_fuse_zen5_v321.json))* | **100% standard `ggml`** (`F32`/`Q8_0`/`IQ4_NL`/`MXFP4`) — drop-in on upstream `llama.cpp b12604+`; `llama-modchip v3.2.1` adds `+144.6%` prefill / `+27.8%` decode (`+33.4%` at `-t 8` pinned) on Zen 5 |
+| **`16–32 GB` Tier**<br/>*(Looped-MoE Reasoning)* | **[`Inkling-2-Mini Monza-RS v3`](https://huggingface.co/Synchopate/Inkling-2-Mini-Monza-RS-v3-GGUF)**<br/>*(`--preset monza` · `26.07B` / `128` experts · Apache 2.0)* | **`14.34 GiB`** (`15,398,405,888 B`, `1` file) | *Not yet cgroup-certified* (`24 GB` Mac / `32 GB` PC / `16 GB` GPU short ctx) | **`227.43` `pp512` / `13.29` `tg128` t/s**<br/>*(`13.87` `tg128` at `-t 8` `MODCHIP_PIN_CORES=1`; `+144.6% / +27.8%` vs `92.98 / 10.40`, [`JSON`](benchmarks/results/inkling2_monza_v3_fuse_zen5_v321.json))* | **100% standard `ggml`** (`F32`/`Q8_0`/`IQ4_NL`/`MXFP4`) — drop-in on upstream `llama.cpp b12604+`; `llama-modchip v3.2.2` adds `+144.6%` prefill / `+27.8%` decode (`+33.4%` at `-t 8` pinned) on Zen 5 |
 
 ---
 
@@ -69,13 +69,13 @@ curl -sL https://raw.githubusercontent.com/synchopate/llama-modchip/main/install
 
 ### Direct Portable Binary Run (`GLIBC_2.30` Linux `x86_64` `-avx512` / `-avx2`)
 
-All 12 `v3.2.1` Linux `x86_64` binaries link `libstdc++`, `libgcc`, and `libgomp.a` statically (`NEEDED = [libdl.so.2, libpthread.so.0, libm.so.6, libc.so.6, ld-linux-x86-64.so.2]`, `max_glibc <= 2.30`, `0` `%zmm` instructions in `-avx2`, `0` `vdpbf16ps` in `-avx512`):
+All 12 `v3.2.2` Linux `x86_64` binaries link `libstdc++`, `libgcc`, and `libgomp.a` statically (`NEEDED = [libdl.so.2, libpthread.so.0, libm.so.6, libc.so.6, ld-linux-x86-64.so.2]`, `max_glibc <= 2.30`, `0` `%zmm` instructions in `-avx2`, `0` `vdpbf16ps` in `-avx512`):
 
 ```bash
 # 1. Auto-select -avx512 (Zen 4/5, Ice Lake+) or -avx2 (Haswell+, Zen 1-3, Alder/Raptor Lake) and verify SHA-256:
 BIN_ISA=$(grep -q "avx512f" /proc/cpuinfo && grep -Eq "avx512_?vbmi" /proc/cpuinfo && grep -Eq "avx512_?vnni" /proc/cpuinfo && echo "avx512" || echo "avx2")
-curl -fLO "https://github.com/synchopate/llama-modchip/releases/download/v3.2.1/llama-server-modchip-linux-x86_64-${BIN_ISA}"
-curl -fLO "https://github.com/synchopate/llama-modchip/releases/download/v3.2.1/SHA256SUMS"
+curl -fLO "https://github.com/synchopate/llama-modchip/releases/download/v3.2.2/llama-server-modchip-linux-x86_64-${BIN_ISA}"
+curl -fLO "https://github.com/synchopate/llama-modchip/releases/download/v3.2.2/SHA256SUMS"
 sha256sum -c SHA256SUMS --ignore-missing
 chmod +x "llama-server-modchip-linux-x86_64-${BIN_ISA}"
 
@@ -106,6 +106,7 @@ env RC_TABLES_DIR=/nonexistent "./llama-server-modchip-linux-x86_64-${BIN_ISA}" 
 
 # 2D. [Looped-MoE Reasoning · 16–32 GB Tier] Inkling-2-Mini Monza-RS v3 (14.34 GiB, Apache 2.0, 100% standard ggml):
 # One-command installer with SHA-256 verification: ./install.sh --preset monza
+# Opt-in Apple LoopCD (arXiv:2610.02185): prepend MODCHIP_LOOPCD_MODE=adaptive (default OFF)
 hf download Synchopate/Inkling-2-Mini-Monza-RS-v3-GGUF \
   Inkling-2-Mini-Monza-RS-v3-Ultimate.gguf --local-dir .
 env RC_TABLES_DIR=/nonexistent "./llama-server-modchip-linux-x86_64-${BIN_ISA}" \
@@ -118,16 +119,16 @@ env RC_TABLES_DIR=/nonexistent "./llama-server-modchip-linux-x86_64-${BIN_ISA}" 
 ```
 
 > [!IMPORTANT]
-> **Critical Runtime Best Practices (`v3.2.1`):**
+> **Critical Runtime Best Practices (`v3.2.2`):**
 > - **Non-Convoy Threading (`-t $((N_CORES - 1)) -tb $((N_CORES - 1)) --poll 0 --poll-batch 0`):** Leaving 1 core free for HTTP/OS dispatch and disabling busy-polling eliminates thread-pool barrier convoys (`+25.9%` `pp512`, `+31.3%` `tg128` over oversubscribed `-t N --poll 50`). `./modchip` configures this automatically.
 > - **Vocabulary Isolation (`RC_TABLES_DIR=/nonexistent` on Non-Nemotron Models):** When serving `Qwen3.8` (`248K` vocab) or `DeepSeek-V4` (`129K` vocab) from a working directory containing `./workspace/routecrack` Nemotron tables, always set `RC_TABLES_DIR=/nonexistent` (not merely unset) so `RouteCrack 2.0` runs in clean online session mode. `./modchip` enforces this automatically.
-> - **Default `--repack` ON (`v3.2.1`) vs. Unpatched Upstream `llama.cpp`:** `llama-modchip v3.2.1` fixes upstream `CPU_REPACK` `q8_cache` / `repack.cpp` bugs while preserving zero-copy `mmap` on 3D MoE tensors (`RssAnon = 1.81–1.92 GiB`). Users loading `Qwen3.8` GGUFs on **unpatched upstream `llama.cpp`** should pass `--no-repack` (`-nr`); `--no-repack` is **not** needed on `llama-modchip v3.2.1`.
+> - **Default `--repack` ON (`v3.2.2`) vs. Unpatched Upstream `llama.cpp`:** `llama-modchip v3.2.2` fixes upstream `CPU_REPACK` `q8_cache` / `repack.cpp` bugs while preserving zero-copy `mmap` on 3D MoE tensors (`RssAnon = 1.81–1.92 GiB`). Users loading `Qwen3.8` GGUFs on **unpatched upstream `llama.cpp`** should pass `--no-repack` (`-nr`); `--no-repack` is **not** needed on `llama-modchip v3.2.2`.
 > - **`MaxQ-32GB` Anti-Repetition Sampling & `<think>` Token Budgets:** At `1.63 bpw`, `MaxQ-32GB` must be run with `temperature=0.6`, `top_p=0.95`, `top_k=20`, `presence_penalty=0.2`–`1.0`, `repeat_penalty=1.05` (`4 / 4 = 100%` loop-free on Blind-4 vs. greedy `temp=0` tail loops without penalties; `./modchip` passes these flags automatically on 32 GB presets). Whenever `enable_thinking=True`, set **`max_tokens >= 16384` on `Qwen3.8`** and **`max_tokens >= 4096` on `Nemotron-3.5`** (whose default Jinja template enables `<think>...</think>` unless `enable_thinking: false` / `--reasoning-budget 0` is passed).
 
 | `./modchip` Command | Description |
 | :--- | :--- |
-| **`./modchip setup`** | Auto-detects RAM tier (`16 / 32 / 64 GB`) & CPU ISA, installs `v3.2.1` engine + SHA-256 verified GGUF |
-| **`./modchip download-bin [--all-tools]`** | Installs portable `GLIBC_2.30` Linux `x86_64` `-avx512` or `-avx2` `v3.2.1` binaries (`--all-tools` adds `bench`/`perplexity`/`quantize`) |
+| **`./modchip setup`** | Auto-detects RAM tier (`16 / 32 / 64 GB`) & CPU ISA, installs `v3.2.2` engine + SHA-256 verified GGUF |
+| **`./modchip download-bin [--all-tools]`** | Installs portable `GLIBC_2.30` Linux `x86_64` `-avx512` or `-avx2` `v3.2.2` binaries (`--all-tools` adds `bench`/`perplexity`/`quantize`) |
 | **`./modchip start` / `stop`** | Starts or stops background `llama-server` (`:8789`) + Agentic SSE Gateway (`:8787`) |
 | **`./modchip chat`** | Interactive terminal chat with live `tok/s`, TTFT, and `RouteCrack 2.0` telemetry |
 | **`./modchip web`** | Opens the Dark-Mode Web Chat & Live Telemetry HUD (`http://127.0.0.1:8787`) |
@@ -168,7 +169,7 @@ Evaluated on `40 x 512` blind `wiki-alt.txt` chunks (`0.000000%` 8-gram and 13-g
 </details>
 
 <details>
-<summary><b>Pinned <code>v3.2.1</code> Fleet GGUF, Binary &amp; Patch <code>SHA-256</code> Checksums (`./modchip checksums`)</b></summary>
+<summary><b>Pinned <code>v3.2.2</code> Fleet GGUF, Binary &amp; Patch <code>SHA-256</code> Checksums (`./modchip checksums`)</b></summary>
 <br/>
 
 ```text
@@ -194,19 +195,19 @@ a8654d4d5fedf748d6f2b6404a8b7f9e19435a8aa8e2bb97ce9a66bc012c0f3a  DeepSeek-V4-Fl
 # Looped-MoE Reasoning — Inkling-2-Mini Monza-RS v3 (Apache 2.0)
 5f1df36927b56d761ede5359c1212d8443cee8330269062c0a0a3c96ed616038  Inkling-2-Mini-Monza-RS-v3-Ultimate.gguf (15,398,405,888 B · 100% std ggml)
 
-# Portable llama-modchip v3.2.1 Linux x86_64 Binaries, Tarball & Patch (GLIBC <= 2.30)
-23b45516877cb0e7acb87e6b9c1586e5d5b7e0b1e4b103ffa558c3fd36fa02c8  patches/llama-modchip-v3.2.patch
-6cc390594f9906b18866eb0d3af534fcb2d3fa486d8b7193aa93597c703886c7  llama-server-modchip-linux-x86_64-avx512
-d4416540f0e7fa50c42048e2ff072b37d85593c3e4bb54cf534a8024f330905b  llama-server-modchip-linux-x86_64-avx2 (and llama-server-modchip-linux-x86_64)
-011ff32668f891fd14334cfdd47bf574592c062a4f6ec6ce05ac49d9af255cea  llama-cli-modchip-linux-x86_64-avx512
-85838adb22a95c4f8e645a37b8567889e4cb9c4744c2ebbb2cfd686c66e6f249  llama-cli-modchip-linux-x86_64-avx2 (and llama-cli-modchip-linux-x86_64)
-4b923d9a4d7ad804154a890d101255985096abd1c360b7fe430239c068a09588  llama-bench-modchip-linux-x86_64-avx512
-e0cc573b2cd9cf333d1105edf21b926994cd18d3a60f7985cde0a45df8c5df7f  llama-bench-modchip-linux-x86_64-avx2
-e9b676c7d8012b3831dfef43cf883e94a2788d5ffdd8606f87c09b12fb677f41  llama-perplexity-modchip-linux-x86_64-avx512
-397f95e83ced02d864804e4993c666a45ccc640b35c5b99c44ed4dd758ee85aa  llama-perplexity-modchip-linux-x86_64-avx2
-69fc09f1948c0057c9cc86ff3fd74e80cf9876fe8b19d6f97113e7957ce65573  llama-quantize-modchip-linux-x86_64-avx512
-46836e4fd1cb54ab581f6429be77735695dc63dfe15a16d65f4f276a19f767ec  llama-quantize-modchip-linux-x86_64-avx2
-9403629e54b9134cb3f9784ba77a47b8bb5da81565e8e236e8836e2892477022  llama-modchip-v3.2.1-linux-x86_64.tar.gz
+# Portable llama-modchip v3.2.2 Linux x86_64 Binaries, Tarball & Patch (GLIBC <= 2.30)
+fa74822e6d4ac9bd5460eda34d5908753128585ae2236bb29f7a14fef79d002c  patches/llama-modchip-v3.2.patch
+c673cad9e7aa45e2351e92247ebf9791a934b835cf6a1f3e9c7e46f27b25bdc6  llama-server-modchip-linux-x86_64-avx512
+9465fa9c21eabf8b843997e95537b5b545313e8181b25cbfd3a6449549b827d8  llama-server-modchip-linux-x86_64-avx2 (and llama-server-modchip-linux-x86_64)
+cd949bf1785b747952a802007195db6b927f46fbff2f126743787d064250db79  llama-cli-modchip-linux-x86_64-avx512
+ff13d9fa32a3ba6502aedacad2ccf2598d18312ccbe6de8cb9cde3a5d5bb7301  llama-cli-modchip-linux-x86_64-avx2 (and llama-cli-modchip-linux-x86_64)
+fd6a9624417921b20c363e6958807fe16e222fd37fd8d3d53eda5c49a29c67c2  llama-bench-modchip-linux-x86_64-avx512
+7a5b5146638954e7a5206fb7398fa298cd7ca890ac5f04a14d9dabb022241c19  llama-bench-modchip-linux-x86_64-avx2
+19f35504b91a392ad5682426737d1567e9fa13c33b19ce3662aa1f556932f08b  llama-perplexity-modchip-linux-x86_64-avx512
+2262daade88e4269bec9ed2dc8be1e735490833c903bf7612c8b7f880069667d  llama-perplexity-modchip-linux-x86_64-avx2
+f34d3f046513d535d392dfaa6a44a2045a69abbfc945a71c4a5ee524bd2c3a43  llama-quantize-modchip-linux-x86_64-avx512
+b33bd3da311ec61daea7e8f626e2108642e9d077d40bdc36b685efa0942eb1ac  llama-quantize-modchip-linux-x86_64-avx2
+7ce80d0109e8d580833bfe3c7988f0c8402774ad91b2212a6f67de76b547f228  llama-modchip-v3.2.2-linux-x86_64.tar.gz
 ```
 
 </details>
@@ -253,7 +254,7 @@ Measured on 16 Zen 5 cores (`taskset -c 16-31`, `mmap` enabled, default `--repac
 
 Full quality gate breakdowns, `ref5632.kld` 51-chunk / 49-chunk blind logs, and `BF16` SQNR tables are preserved in **[`benchmarks/QUALITY_GATE_VQ3_64.md`](benchmarks/QUALITY_GATE_VQ3_64.md)**, **[`docs/DEEPSEEK_V4_OPTIMIZATIONS.md`](docs/DEEPSEEK_V4_OPTIMIZATIONS.md)**, and **[`docs/NEMOTRON_OPTIMIZATIONS.md`](docs/NEMOTRON_OPTIMIZATIONS.md)**:
 
-- **`Inkling-2-Mini Monza-RS v3` (`14.34 GiB` / `15,398,405,888 B`, `26.07B` Total / `128` experts, Apache 2.0, 100% standard `ggml`, `--preset monza` — [HF Model Card](https://huggingface.co/Synchopate/Inkling-2-Mini-Monza-RS-v3-GGUF)):** Single-pass compression from `52.14 GB BF16` down to one `15.40 GB` (`14.34 GiB`) standard GGUF (`F32`/`Q8_0`/`IQ4_NL`/`MXFP4`, drop-in compatible with upstream `llama.cpp b12604+`). With `llama-modchip v3.2.1` AVX-512 fusion (`MODCHIP_INK2_FUSE=1`, `MODCHIP_GEMM_TILE=1`, `LLAMA_NT_STREAM_MM=1`, [`JSON`](benchmarks/results/inkling2_monza_v3_fuse_zen5_v321.json)), reaches **`227.43 tok/s` `pp512` (`+144.6%`, `2.45×`)** and **`13.29 tok/s` `tg128` (`+27.8%`)** vs. same-binary unfused (`92.98 / 10.40 tok/s`) on 16C Zen 5 (`13.87 tok/s` `+33.4%` at `-t 8` `MODCHIP_PIN_CORES=1`; `10.57 tok/s` at `d=8192`), with verified WikiText-2 parity (`PP512 Mean KLD = 0.0018`, `50-chunk N=1 ΔPPL = +0.003%`). On our `Italian Enterprise 200` suite under a `4,096`-token completion budget, `Monza-RS v3` reaches **`93.0%` vs. `78.0%`** for the stock `BF16` baseline (`p_HB = 3.62e-6`, **`-57.5%`** thinking tokens `472` vs. `1,111`) and **`79.7%` vs. `74.9%`** on public `IFEval Strict 541` (`p_HB = 0.0243`), while maintaining exact uncapped parity (`96.3% = 96.3%`; full methodology and ablations on the [Hugging Face Model Card](https://huggingface.co/Synchopate/Inkling-2-Mini-Monza-RS-v3-GGUF)).
+- **`Inkling-2-Mini Monza-RS v3` (`14.34 GiB` / `15,398,405,888 B`, `26.07B` Total / `128` experts, Apache 2.0, 100% standard `ggml`, `--preset monza` — [HF Model Card](https://huggingface.co/Synchopate/Inkling-2-Mini-Monza-RS-v3-GGUF)):** Single-pass compression from `52.14 GB BF16` down to one `15.40 GB` (`14.34 GiB`) standard GGUF (`F32`/`Q8_0`/`IQ4_NL`/`MXFP4`, drop-in compatible with upstream `llama.cpp b12604+`). With `llama-modchip v3.2.2` AVX-512 fusion (`MODCHIP_INK2_FUSE=1`, `MODCHIP_GEMM_TILE=1`, `LLAMA_NT_STREAM_MM=1`, [`JSON`](benchmarks/results/inkling2_monza_v3_fuse_zen5_v321.json)), reaches **`227.43 tok/s` `pp512` (`+144.6%`, `2.45×`)** and **`13.29 tok/s` `tg128` (`+27.8%`)** vs. same-binary unfused (`92.98 / 10.40 tok/s`) on 16C Zen 5 (`13.87 tok/s` `+33.4%` at `-t 8` `MODCHIP_PIN_CORES=1`; `10.57 tok/s` at `d=8192`), with verified WikiText-2 parity (`PP512 Mean KLD = 0.0018`, `50-chunk N=1 ΔPPL = +0.003%`). On our `Italian Enterprise 200` suite under a `4,096`-token completion budget, `Monza-RS v3` reaches **`93.0%` vs. `78.0%`** for the stock `BF16` baseline (`p_HB = 3.62e-6`, **`-57.5%`** thinking tokens `472` vs. `1,111`) and **`79.7%` vs. `74.9%`** on public `IFEval Strict 541` (`p_HB = 0.0243`), while maintaining exact uncapped parity (`96.3% = 96.3%`; full methodology and ablations on the [Hugging Face Model Card](https://huggingface.co/Synchopate/Inkling-2-Mini-Monza-RS-v3-GGUF)).
 
 <p align="center">
   <a href="https://huggingface.co/Synchopate/Inkling-2-Mini-Monza-RS-v3-GGUF">
@@ -266,19 +267,22 @@ Full quality gate breakdowns, `ref5632.kld` 51-chunk / 49-chunk blind logs, and 
 
 ---
 
-## What Is New in `llama-modchip v3.2.1`
+## What Is New in `llama-modchip v3.2.2`
 
-1. **16×8 A-Packed Broadcast-B VNNI Panel GEMM (`MODCHIP_GEMM_TILE=1`), Bounded-Error (`<1 ULP`) `Inkling-2-Mini` AVX-512 Graph Fusion (`MODCHIP_INK2_FUSE=1`, mask `0xEFF`), & Non-Temporal Streaming (`LLAMA_NT_STREAM_MM=1`, all default ON) ([`patches/llama-modchip-v3.2.patch`](patches/llama-modchip-v3.2.patch), [`JSON`](benchmarks/results/inkling2_monza_v3_fuse_zen5_v321.json)):**
-   - Adds a 16-row on-the-fly A-packed + `{1to16}` broadcast-B ILP-8 AVX-512 VNNI panel GEMM (`KB=12, JB=64`, `38 KB` stack, zero register spills, zero AVX-512DQ, `<= 5.4e-7` max relative error vs FP64 across 4.1M independent checks) for `IQ4_NL`, `MXFP4`, and `Q8_0`, plus 12-bit `Inkling-2` graph fusion (`0xEFF`: fused SiTU, L2 clip, depth-attention `mix`, shortconv, loop control, relative-bias gather, gated attention, softcap unpad, fused N=1 multi-output `Q8_0` attention/`lm_head`, and fused N=1 `IQ4_NL`/`MXFP4` MoE) with strict `tensor_is_plain_cpu()` CPU/repack safety and opt-in glibc Linux L3/CCD physical-core pinning (`MODCHIP_PIN_CORES=1`, no-op on musl/Android/macOS/Windows). On `Inkling-2-Mini Monza-RS v3` (`14.34 GiB`, portable `v3.2.1` `llama-bench-modchip-linux-x86_64-avx512`, `Ryzen 9 9955HX`, `-t 16 -ngl 0 -fa 1`), achieves **`227.43 tok/s` prefill (`+144.6%`, `2.45×`)** and **`13.29 tok/s` decode (`+27.8%`)** vs. same-binary unfused `FUSE=0 NTA=0 TILE=0` (`92.98 / 10.40 tok/s`; `92.19 / 10.65` with `NTA=1`), reaching **`13.87 tok/s` (`+33.4%`, `94.4%` of DDR5 bandwidth ceiling)** at `-t 8 -lm none` with `MODCHIP_PIN_CORES=1` (`10.57 tok/s` at `d=8192`), with verified WikiText-2 parity (`PP512 Mean KLD = 0.0018`, `99.96%` log-PPL corr; `50-chunk N=1 ΔPPL = +0.003%`, `Mean KLD = 0.0027`).
-2. **Quantized & Heterogeneous Split-KV Decode (`+15.1%`–`+61.4%` at `32K`) + Upstream `llama.cpp @ 46eb1742d` (`b12604`) Rebase:**
+1. **Opt-In Apple `LoopCD` (`arXiv:2610.02185`) & Variable Loop Depth for `Inkling-2-Mini` (`MODCHIP_LOOPCD_MODE=off` default; opt-in `adaptive|logits|hidden`, `MODCHIP_INK2_LOOPS=1..6`, [`JSON`](benchmarks/results/inkling2_monza_v3_loopcd_v322.json)):**
+   - First native C++ multi-backend `llama.cpp` implementation of `LoopCD-Hidden` (`Eq. 2`, `0.0%` decode cost), `LoopCD-Logits` Fixed (`Eq. 3`), and `LoopCD-Logits` Adaptive Margin-Gated (`Eq. 4`, `MODCHIP_LOOPCD_MODE=adaptive`, defaulting to `omega=0.50, ref=0` [Pass 1]) with pure-`ggml` GPU/repack fallback and **zero overhead / bit-identical `v3.2.2` execution when unset**.
+   - Verified on `Inkling-2-Mini Monza-RS v3` (`14.34 GiB`, 0 GPU Zen 5): lifts **563 blind MC tasks** (`WinoGrande`, `ARC-Challenge`, `MMLU`, `HellaSwag`) from `68.21%` to **`71.58%`** (`+3.37 pp`, McNemar `p=0.0271`), while a negative-omega falsification placebo (`omega=-0.50`) crashes to **`62.88%`** (`-5.33 pp` -> **`+8.70 pp`** pure causal separation, `p=1.17e-5`); lifts the **60-task `T=0` generation safety gate** (`IFEval-Strict`, `HumanEval+`, `Italian Enterprise`) from `91.67%` (`55/60`) to **`93.33%`** (`56/60`, `+1/-0` zero regressions, `-5.1%` decode cost).
+2. **16×8 A-Packed Broadcast-B VNNI Panel GEMM (`MODCHIP_GEMM_TILE=1`), Bounded-Error (`<1 ULP`) `Inkling-2-Mini` AVX-512 Graph Fusion (`MODCHIP_INK2_FUSE=1`, mask `0xEFF`), & Non-Temporal Streaming (`LLAMA_NT_STREAM_MM=1`, all default ON) ([`patches/llama-modchip-v3.2.patch`](patches/llama-modchip-v3.2.patch), [`JSON`](benchmarks/results/inkling2_monza_v3_fuse_zen5_v321.json)):**
+   - Adds a 16-row on-the-fly A-packed + `{1to16}` broadcast-B ILP-8 AVX-512 VNNI panel GEMM (`KB=12, JB=64`, `38 KB` stack, zero register spills, zero AVX-512DQ, `<= 5.4e-7` max relative error vs FP64 across 4.1M independent checks) for `IQ4_NL`, `MXFP4`, and `Q8_0`, plus 12-bit `Inkling-2` graph fusion (`0xEFF`: fused SiTU, L2 clip, depth-attention `mix`, shortconv, loop control, relative-bias gather, gated attention, softcap unpad, fused N=1 multi-output `Q8_0` attention/`lm_head`, and fused N=1 `IQ4_NL`/`MXFP4` MoE) with strict `tensor_is_plain_cpu()` CPU/repack safety and opt-in glibc Linux L3/CCD physical-core pinning (`MODCHIP_PIN_CORES=1`, no-op on musl/Android/macOS/Windows). On `Inkling-2-Mini Monza-RS v3` (`14.34 GiB`, portable `v3.2.2` `llama-bench-modchip-linux-x86_64-avx512`, `Ryzen 9 9955HX`, `-t 16 -ngl 0 -fa 1`), achieves **`227.43 tok/s` prefill (`+144.6%`, `2.45×`)** and **`13.29 tok/s` decode (`+27.8%`)** vs. same-binary unfused `FUSE=0 NTA=0 TILE=0` (`92.98 / 10.40 tok/s`; `92.19 / 10.65` with `NTA=1`), reaching **`13.87 tok/s` (`+33.4%`, `94.4%` of DDR5 bandwidth ceiling)** at `-t 8 -lm none` with `MODCHIP_PIN_CORES=1` (`10.57 tok/s` at `d=8192`), with verified WikiText-2 parity (`PP512 Mean KLD = 0.0018`, `99.96%` log-PPL corr; `50-chunk N=1 ΔPPL = +0.003%`, `Mean KLD = 0.0027`).
+3. **Quantized & Heterogeneous Split-KV Decode (`+15.1%`–`+61.4%` at `32K`) + Upstream `llama.cpp @ 46eb1742d` (`b12604`) Rebase:**
    - Unlocks CPU Split-KV decode (`use_split_kv_path`) for quantized and heterogeneous KV caches (`Q8_0/Q4_0`, `Q4_0/Q4_0`) whenever `n_head < n_threads` or `nek1 >= 2048 && n_head % n_threads != 0` (`LLAMA_MODCHIP_SPLIT_KV_QUANT=0|1|2`, default `1`), fixing `+ CACHE_LINE_SIZE_F32` decode scratch sizing (`ggml-cpu.c`) and SWA/NTA `cur_pos`/`n_kv_cols` boundaries (`ops.cpp`). Verified persistent-threadpool `32K` attention speedup: **`+61.4%`** (`Q=12/KV=4/D=256 q8_0/q4_0`, `4.356 -> 2.699 ms`), **`+39.7%`** (`Q=24/KV=8/D=128 q8_0/q4_0`), **`+21.6%`** (`q4_0/q4_0`), **`+15.1%`** (`Q=32/KV=4/12T`) with `~2e-8` parity vs `nth=1`.
    - Rebased onto `ggml-org/llama.cpp @ 46eb1742d` (`b12604`), including native `Inkling-2` (`src/models/inkling2.cpp`), with zero ABI collisions (`41..45`).
-3. **Native C++ Chained-Prefix HARP-Cache v2, `11.3×` Batched FNV-1a Acceleration & EAKV Vectorization ([`speculative/cpp/rc_harp_radix.h`](speculative/cpp/rc_harp_radix.h), [`kv_cache/harp_cache.py`](kv_cache/harp_cache.py), PRs `#54`–`#61`):**
+4. **Native C++ Chained-Prefix HARP-Cache v2, `11.3×` Batched FNV-1a Acceleration & EAKV Vectorization ([`speculative/cpp/rc_harp_radix.h`](speculative/cpp/rc_harp_radix.h), [`kv_cache/harp_cache.py`](kv_cache/harp_cache.py), PRs `#54`–`#61`):**
    - Adds an O(L/256) chained FNV-64 Radix index (`H_k = FNV64(H_{k-1} || B_k)` + model fingerprint), True LRU eviction, and non-destructive multi-branch shared-prefix preservation (fixing the `f_keep < 0.25` cliff for `lcp >= 512`) natively inside `llama-server` (`server-slot-sched.{h,cpp}` & `server-context.cpp`), plus `11.3×` batched FNV-1a acceleration (`kv_cache/fnv_accel.py`), O(1) radix eviction, and vectorized EAKV quantization.
    - Opt-in `/dev/shm` persistent slot mirror (`LLAMA_MODCHIP_HARP_SHM=1` + `--slot-save-path`, `0600` + `O_NOFOLLOW` + atomic rename) restores `105.20 MiB` (`1,302/1,319` tokens) after a cold server restart in **`16.40 ms` raw KV snapshot restore (`6.26 GiB/s`; `1,351 ms` total TTFT, `10.7×` speedup vs `14.47 s` cold prefill)** while cleanly dropping causally diverged prefixes (`cache_n=0`).
-4. **`RouteCrack 2.0` (`--spec-type routecrack2`) & Cross-ISA Bit-Identical `832 B` `L1 Micro-Arbiter` ([`speculative/cpp/rc_arbiter_l1.h`](speculative/cpp/rc_arbiter_l1.h), [`speculative/cpp/rc_routecrack2.h`](speculative/cpp/rc_routecrack2.h)):**
+5. **`RouteCrack 2.0` (`--spec-type routecrack2`) & Cross-ISA Bit-Identical `832 B` `L1 Micro-Arbiter` ([`speculative/cpp/rc_arbiter_l1.h`](speculative/cpp/rc_arbiter_l1.h), [`speculative/cpp/rc_routecrack2.h`](speculative/cpp/rc_routecrack2.h)):**
    - Unifies **NextN MTP / `RCPredictor`**, **O(1) Two-Zone 40K Suffix Indexing**, and **Stockfish-PVS (`192 KB` Zobrist TT + 28-bit Tagged Mode Refutation)** under an **`832 B` (`13` cache lines) L1-resident `[10 -> 16 -> 1]` SIMD Micro-Arbiter** (`AVX-512` `zmm`, `AVX2+FMA` `2x ymm`, `ARM64 NEON` `vfmaq_n_f32`) with cross-ISA bit-identical `NaN`/`±Inf` sanitization and three hardware-calibrated cost profiles (`kRC2DefaultArbiter`, `kRC2DraftlessArbiter`, `kRC2HeavyMoEDraftlessArbiter`).
-5. **Zero-Collision Custom Tensor Type IDs (`44` & `45`), 512-Bit SIMD Kernels & Zero-Copy 3D MoE `--repack`:**
+6. **Zero-Collision Custom Tensor Type IDs (`44` & `45`), 512-Bit SIMD Kernels & Zero-Copy 3D MoE `--repack`:**
    - Preserves upstream `GGML_TYPE_Q1_0 = 41`, `GGML_TYPE_Q2_0 = 42`, and `GGML_TYPE_F8_E4M3 = 43` **100% untouched**; registers `Fractal-64` (`3.75 bpw`, CPU + Apple Metal) at `GGML_TYPE_FRACTAL_64 = 44` and `LUT-VQ3-64` (`3.00 bpw`, AVX-512 VBMI `VPERMI2B` + AVX2/NEON/scalar) at `GGML_TYPE_VQ3_64 = 45`.
    - Dedicated AVX-512 VNNI/BW kernels for `Q1_0`, `Q2_0`, `Q8_0`, `MXFP4`, fused 8-`zmm` FMA multi-threaded `GATED_DELTA_NET`, zero-copy 3D MoE `mmap` under default `--repack`, and inward `2 MiB` `MADV_HUGEPAGE` alignment.
 
@@ -293,8 +297,8 @@ Microarchitectural details and tuning flags are documented in **[`docs/HARDWARE_
 | **AMD Zen 5 (`Desktop / Mobile / Server`)** | `Ryzen 9 9955HX`, `9950X`, `Ryzen 7 9800X3D`, `EPYC 9005 Turin` | • Single-cycle 512-bit **AVX-512 (`VPDPBUSD`, `VBMI VPERMI2B`, 8-`zmm` GDN)**<br/>• **Zero-copy 3D MoE `--repack` + `2MB` THP (`MADV_HUGEPAGE`)** + `_MM_HINT_NTA` L3 isolation | **[Hardware Guide §2.1](docs/HARDWARE_OPTIMIZATIONS.md)**<br/>[`install.sh`](install.sh) |
 | **AMD Zen 4 Multi-CCD (`Threadripper / EPYC`)** | `Threadripper PRO 7985WX` (`64C/128T`, `8 CCDs`, `256 MB` L3) | • **Dynamic sysfs L3 CCD Topology Discovery** ([`scripts/llama_modchip.py`](scripts/llama_modchip.py))<br/>• **Deterministic `4C/CCD` Stride (`-t 32`)**: avoids Infinity Fabric saturation (`111.6 tok/s`) | **[Hardware Guide §2.2](docs/HARDWARE_OPTIMIZATIONS.md)**<br/>[Issue #1](https://github.com/synchopate/llama-modchip/issues/1) |
 | **AMD 3D V-Cache + Radeon Vulkan Hybrid** | `Ryzen 9 7945HX3D` (`128 MB` L3) + `RX 9070 XT 16GB` (`RADV`) | • **Tensor-Role Splitting (`-ngl 99 --n-cpu-moe N`)**<br/>• Native **Vulkan `SSM_SCAN` + `MXFP4` GPU Shaders** (`80.8 tok/s` at 256K) | **[Hardware Guide §2.3](docs/HARDWARE_OPTIMIZATIONS.md)**<br/>[`FAQ.md`](FAQ.md) |
-| **Intel / AMD + NVIDIA RTX (`Windows 10/11`)** | `Ryzen 7 9800X3D` (`1M` ctx), `Core i9-9900K / 14900K` + `RTX 2080 Ti / 3090 / 4090` | • **Unified `v3.2.1` MinGW-w64 & MSVC+CUDA Builder** ([`windows/build_patched_engine.ps1`](windows/build_patched_engine.ps1))<br/>• **Live-VRAM `--n-cpu-moe` Solver (`550 MB` WDDM Reserve)** | **[Windows Port](docs/WINDOWS_PORT.md)**<br/>[`windows/`](windows/README.md) |
-| **Apple Silicon (`M1 / M2 / M3 / M4 / M5`)** | `M5 Max` (`64 GB`), `M4 Max` (`64/36 GB`), `M4 Pro` (`24 GB`), `M3 Max`, `M1 Max` | • **Unified `v3.2.1` Metal + ARM64 NEON `SDOT` Engine** ([`apple-silicon/build-dsv4-engine.sh`](apple-silicon/build-dsv4-engine.sh))<br/>• `249.76 / 236.30 tok/s` `RouteCrack 2.0` on M4 Max (`Nemotron Q4_0`); `27.0 tok/s` historical `DeepSeek-V4 Fractal` on M5 Max | **[Apple Silicon Guide](apple-silicon/README.md)**<br/>[`dsv4-m5max.md`](apple-silicon/results/dsv4-m5max.md) |
+| **Intel / AMD + NVIDIA RTX (`Windows 10/11`)** | `Ryzen 7 9800X3D` (`1M` ctx), `Core i9-9900K / 14900K` + `RTX 2080 Ti / 3090 / 4090` | • **Unified `v3.2.2` MinGW-w64 & MSVC+CUDA Builder** ([`windows/build_patched_engine.ps1`](windows/build_patched_engine.ps1))<br/>• **Live-VRAM `--n-cpu-moe` Solver (`550 MB` WDDM Reserve)** | **[Windows Port](docs/WINDOWS_PORT.md)**<br/>[`windows/`](windows/README.md) |
+| **Apple Silicon (`M1 / M2 / M3 / M4 / M5`)** | `M5 Max` (`64 GB`), `M4 Max` (`64/36 GB`), `M4 Pro` (`24 GB`), `M3 Max`, `M1 Max` | • **Unified `v3.2.2` Metal + ARM64 NEON `SDOT` Engine** ([`apple-silicon/build-dsv4-engine.sh`](apple-silicon/build-dsv4-engine.sh))<br/>• `249.76 / 236.30 tok/s` `RouteCrack 2.0` on M4 Max (`Nemotron Q4_0`); `27.0 tok/s` historical `DeepSeek-V4 Fractal` on M5 Max | **[Apple Silicon Guide](apple-silicon/README.md)**<br/>[`dsv4-m5max.md`](apple-silicon/results/dsv4-m5max.md) |
 | **ARM64 Cloud & Mini-PC (`Graviton / Fedora`)** | `AWS Graviton3 m7g.2xlarge`, `Ryzen 7 8745HS` (`GEEKOM A8`) | • **ARMv8.4-A `SDOT` (`44.97 tok/s`)** & Fedora 44 CPU/Vulkan workflow | **[Fedora Guide](fedora/README.md)**<br/>[Issue #2](https://github.com/synchopate/llama-modchip/issues/2) |
 
 ### Hardware Readiness Check (Zero Model Download Required)
@@ -313,7 +317,7 @@ Run **`./modchip bench`** (or **`windows\BENCHMARK_PC.bat`** on Windows) and **[
 | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
 | **`Qwen3.8-MaxQ-64GB` on Zen 5 (`v3.1.1`)** | `16C` (`AVX-512`) | `60 GiB` cold cg PASS (`48.35 GiB` peak, `pgsteal=0`, `0 GPU`) | **`72.0 – 100.1`** | **`8.78 ± 0.02 tok/s`** *(cold `N=1`)* | **`15.64 ± 0.05 agg / 22.00 W1`** *(cold 60G cg; `15.34 / 21.38` uncapped)* | `@synchopate` (`v3.1.1` JSONs) |
 | **`Qwen3.8-MaxQ-32GB` on Zen 5 (`v3.1.1`)** | `16C` (`AVX-512`) | `28.5 GiB` cold cg PASS (`28.26 GiB` peak, `pgsteal=0`, `0 GPU`) | **`101.3 – 112.9`** | **`10.00 ± 0.01 tok/s`** *(cold `N=1`)* | **`14.58 ± 0.32 agg / 15.31 W1`** *(cold 28.5G cg `RouteCrack 2.0`)* | `@synchopate` (`v3.1.1` JSON) |
-| **`Inkling-2-Mini Monza-RS v3` on Zen 5 (`v3.2.1`)** | `16C` (`AVX-512 VNNI`) | `14.34 GiB` GGUF (`F16` KV, `0 GPU`) | **`227.43`** *(`pp512`, `+144.6%`)* | **`13.29 tok/s`** *(`-t 16` `N=1`, `+27.8%`)* | **`13.87 tok/s`** *(`-t 8` `MODCHIP_PIN_CORES=1`, `+33.4%`; `10.57` at `d=8192`)* | `@synchopate` ([`JSON`](benchmarks/results/inkling2_monza_v3_fuse_zen5_v321.json)) |
+| **`Inkling-2-Mini Monza-RS v3` on Zen 5 (`v3.2.2`)** | `16C` (`AVX-512 VNNI`) | `14.34 GiB` GGUF (`F16` KV, `0 GPU`) | **`227.43`** *(`pp512`, `+144.6%`)* | **`13.29 tok/s`** *(`-t 16` `N=1`, `+27.8%`)* | **`13.87 tok/s`** *(`-t 8` `MODCHIP_PIN_CORES=1`, `+33.4%`; `10.57` at `d=8192`)* | `@synchopate` ([`JSON`](benchmarks/results/inkling2_monza_v3_fuse_zen5_v321.json)) |
 | **Apple M4 Max (`64 GB` Unified Metal · `Nemotron-3.5-30B-Q4_0`)** | `16C CPU + 40C Metal` | `64 GB` LPDDR5X-8533 (`Unified`) | **`23 ms TTFT`** *(~451 pp)* | **`249.76 tok/s`** *(Stage 1, `97.6%` `RouteCrack 2.0`)* | **`236.30 tok/s`** *(Stage 2, `90.3%` accept; `RouteCrack 2.0`)* | `@jbeckman1974` ([Issue #8](https://github.com/synchopate/llama-modchip/issues/8)) |
 | **AMD Threadripper PRO 7985WX (`Zen 4`)** | `64C/128T` (`8 CCDs`, `256 MB` L3) | `256 GB` 8-Ch DDR5-6000 (`0 GPU`) | **`386.00`** *(`-t 32`)* | **`73.84 – 80.14 tok/s`** | **`111.62 tok/s` warm** / **`80.14` cold** *(`-t 32` 4C/CCD)* | `@aifartist` ([Issue #1](https://github.com/synchopate/llama-modchip/issues/1#issuecomment-6595559921)) |
 | **AMD Ryzen Threadripper 9960X (`Zen 5`)** | `24C/48T` (`4 CCDs`, `AVX-512 VBMI`) | `128 GB (125 GiB)` 4-Ch DDR5 (`14.91 GiB` RSS, `2MB THP: 4.45 GiB`, `0 GPU`) | **`450.36`** *(`-t 24`)* | **`49.25 tok/s`** *(`TTFT 254 ms`)* | **`54.43 tok/s`** *(`73.8%` Stockfish-PVS, `VQ3-64`)* | `@pedrosousabarreto` ([Issue #40](https://github.com/synchopate/llama-modchip/issues/40#issuecomment-6916491282)) |
@@ -352,9 +356,9 @@ llama-modchip/
 ├── install.sh                                 # Zero-to-Running 3-Tier Installer (16 GB / 32 GB / 64 GB, pinned HF SHAs)
 ├── release_manifest.json                      # Canonical Single Source of Truth (version, ABI 41..45, SHA-256s, benchmarks)
 ├── README.md / ARCHITECTURE.md / FAQ.md       # Overview, Systems Architecture & Engineering FAQ
-├── RELEASE_NOTES.md                           # v3.2.1 & Historical Release Notes
+├── RELEASE_NOTES.md                           # v3.2.2 & Historical Release Notes
 ├── patches/
-│   ├── llama-modchip-v3.2.patch               # Unified v3.2.1 patch onto llama.cpp 46eb1742d (Linux, macOS Metal, Windows, CUDA, Vulkan)
+│   ├── llama-modchip-v3.2.patch               # Unified v3.2.2 patch onto llama.cpp 46eb1742d (Linux, macOS Metal, Windows, CUDA, Vulkan)
 │   └── archive/                               # Archived v3.1 & v3.0 unified patches
 ├── scripts/
 │   ├── build_zen5_llama.sh                    # Cross-platform CMake builder (applies llama-modchip-v3.2.patch, pins b12604 UI)
@@ -371,8 +375,8 @@ llama-modchip/
 ├── windows/                                   # Windows 10/11 MinGW-w64 & CUDA Builder + Hybrid GPU/CPU Launcher
 ├── fedora/                                    # Fedora 44 / Ryzen 7 8745HS (GEEKOM A8) script
 ├── systemd/                                   # Production systemd service units & madvise THP tmpfiles.d config
-├── paper/                                     # v3.2.1 Technical Paper (main.tex, figures/*.pdf, llama-modchip-paper.pdf, arxiv-submission.tar.gz)
-├── benchmarks/                                # v3.2.1 Quality Gate reports, KLD/PPL evaluators & raw JSON logs
+├── paper/                                     # v3.2.2 Technical Paper (main.tex, figures/*.pdf, llama-modchip-paper.pdf, arxiv-submission.tar.gz)
+├── benchmarks/                                # v3.2.2 Quality Gate reports, KLD/PPL evaluators & raw JSON logs
 └── docs/                                      # Model, hardware, Windows port & release procedure guides
 ```
 

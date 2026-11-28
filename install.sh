@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# install.sh — Interactive Zero-to-Running Installer for llama-modchip (v3.2.1)
+# install.sh — Interactive Zero-to-Running Installer for llama-modchip (v3.2.2)
 # ==============================================================================
 # Usage:
 #   One-liner (from scratch):
@@ -18,8 +18,8 @@
 #                            Looped-MoE: monza (Inkling-2-Mini Monza-RS v3 · 14.34 GiB · Apache 2.0)
 #   --model <path>         Use an existing local GGUF file instead of downloading
 #   --skip-model           Install engine & scripts without downloading GGUF weights
-#   --prebuilt             Download CPU-matched Linux x86_64 v3.2.1 binary (-avx512 / -avx2)
-#   --source               Compile unified v3.2.1 engine locally from source (cmake/g++)
+#   --prebuilt             Download CPU-matched Linux x86_64 v3.2.2 binary (-avx512 / -avx2)
+#   --source               Compile unified v3.2.2 engine locally from source (cmake/g++)
 #   --yes, -y              Non-interactive mode: accept hardware-matched aligned defaults
 #   --accept-abliterated   Confirm opt-in consent when selecting an abliterated preset in --yes mode
 #   --with-mmproj          Also download & pass mmproj-Qwen3.8-Flash-Next-BF16.gguf (0.85 GiB vision projector)
@@ -32,7 +32,7 @@ set -euo pipefail
 SCRIPT_SOURCE="${BASH_SOURCE[0]:-}"
 if [[ -z "$SCRIPT_SOURCE" ]] || [[ ! -f "$(dirname "$SCRIPT_SOURCE")/patches/llama-modchip-v3.2.patch" ]]; then
     echo "=============================================================================="
-    echo " [*] Bootstrapping llama-modchip v3.2.1 repository..."
+    echo " [*] Bootstrapping llama-modchip v3.2.2 repository..."
     echo "=============================================================================="
     if [[ ! -d "./llama-modchip" ]]; then
         if command -v git >/dev/null 2>&1; then
@@ -318,7 +318,7 @@ if [[ "$MODEL_EXPLICIT" == "0" && -z "$MODEL_PRESET" ]]; then
     if [[ "$SKIP_MODEL" == "0" && "$IS_INTERACTIVE" == "1" ]]; then
         echo ""
         echo "------------------------------------------------------------------------------"
-        echo " MAXQ v3.2.1 3-TIER MODEL MATRIX (Detected RAM: ~${TOTAL_RAM_GB} GiB | Physical Cores: ${PHYS_CORES})"
+        echo " MAXQ v3.2.2 3-TIER MODEL MATRIX (Detected RAM: ~${TOTAL_RAM_GB} GiB | Physical Cores: ${PHYS_CORES})"
         echo "------------------------------------------------------------------------------"
         echo "  [64 GB RAM TIER]"
         echo "  1) Qwen3.8-Flash-Next-MaxQ-64GB                 [176.5B (5B Active) · 53.99 GiB · 2 shards]"
@@ -483,7 +483,7 @@ else
         6|nemotron-vq3|NVIDIA-Nemotron-3.5-30B-A3B-VQ3-64)
             MODEL_PRESET="nemotron-vq3"
             MODEL_FAMILY="nemotron"
-            MODEL_LABEL="NVIDIA-Nemotron-3.5-30B-A3B-VQ3-64 (30B · 13.30 GiB · v3.2.1 CPU-Turbo)"
+            MODEL_LABEL="NVIDIA-Nemotron-3.5-30B-A3B-VQ3-64 (30B · 13.30 GiB · v3.2.2 CPU-Turbo)"
             MODEL_REPO="Synchopate/NVIDIA-Nemotron-3.5-30B-A3B-VQ3-64-CPU-GGUF"
             MODEL_REV="d113f815ec2b24d9a1b2cb5f825a318ba37b183b"
             MODEL_SHARDS=("NVIDIA-Nemotron-3.5-30B-A3B-VQ3-64.gguf")
@@ -504,7 +504,7 @@ else
             MODEL_PRESET="nemotron-ablit"
             MODEL_FAMILY="nemotron"
             IS_ABLITERATED=1
-            MODEL_LABEL="NVIDIA-Nemotron-3.5-30B-A3B-Abliterated-VQ3-64 (30B · 13.30 GiB · v3.2.1)"
+            MODEL_LABEL="NVIDIA-Nemotron-3.5-30B-A3B-Abliterated-VQ3-64 (30B · 13.30 GiB · v3.2.2)"
             MODEL_REPO="Synchopate/NVIDIA-Nemotron-3.5-30B-A3B-Abliterated-VQ3-64-CPU-GGUF"
             MODEL_REV="eb42aabff286f7d5b68ac81269b1d670544089cf"
             MODEL_SHARDS=("NVIDIA-Nemotron-3.5-30B-A3B-Abliterated-VQ3-64.gguf")
@@ -525,9 +525,9 @@ else
         dsv4-maxq-fractal|dsv4-vq3|dsv4-fractal|dsv4-ablit|dsv4-abliterated)
             LEGACY_DSV4_PRESET="$MODEL_PRESET"
             echo "[!] NOTICE: Legacy v2.5.4 preset '${LEGACY_DSV4_PRESET}' used retired custom tensor type IDs (42/43) that require llama-modchip v2.5.4."
-            echo "    Redirecting cleanly to v3.2.1 '--preset dsv4-maxq' (DeepSeek-V4-Flash-0731-MaxQ-v4 · 57.99 GiB · 100% standard ggml)."
+            echo "    Redirecting cleanly to v3.2.2 '--preset dsv4-maxq' (DeepSeek-V4-Flash-0731-MaxQ-v4 · 57.99 GiB · 100% standard ggml)."
             if [[ "$LEGACY_DSV4_PRESET" == *ablit* ]]; then
-                echo "    (Tip: For 64 GB opt-in uncensored v3.2.1 deployment, pass '--preset qwen38-64gb-ablit'.)"
+                echo "    (Tip: For 64 GB opt-in uncensored v3.2.2 deployment, pass '--preset qwen38-64gb-ablit'.)"
             fi
             MODEL_PRESET="dsv4-maxq"
             MODEL_FAMILY="dsv4"
@@ -550,7 +550,7 @@ else
         nemotron-fractal)
             MODEL_PRESET="nemotron-fractal"
             MODEL_FAMILY="nemotron"
-            MODEL_LABEL="NVIDIA-Nemotron-3.5-30B-A3B-Fractal-64 (30B · 14.36 GiB · v3.2.1)"
+            MODEL_LABEL="NVIDIA-Nemotron-3.5-30B-A3B-Fractal-64 (30B · 14.36 GiB · v3.2.2)"
             MODEL_REPO="Synchopate/NVIDIA-Nemotron-3.5-30B-A3B-Fractal-64-CPU-GGUF"
             MODEL_REV="d1336d5828ed475d4bd6e6604cadf52250a4c818"
             MODEL_SHARDS=("NVIDIA-Nemotron-3.5-30B-A3B-Fractal-64.gguf")
@@ -569,7 +569,7 @@ else
             ;;
         *)
             echo "[!] ERROR: Unknown --preset '${MODEL_PRESET}'." >&2
-            echo "    Valid v3.2.1 presets: qwen38-64gb, qwen38-64gb-ablit, dsv4-maxq, qwen38-32gb, qwen38-32gb-ablit, nemotron-vq3, nemotron-maxq-16gb, nemotron-ablit, monza" >&2
+            echo "    Valid v3.2.2 presets: qwen38-64gb, qwen38-64gb-ablit, dsv4-maxq, qwen38-32gb, qwen38-32gb-ablit, nemotron-vq3, nemotron-maxq-16gb, nemotron-ablit, monza" >&2
             exit 1
             ;;
     esac
@@ -626,7 +626,7 @@ if [[ "$IS_ABLITERATED" == "1" ]]; then
     fi
 fi
 
-# Unified v3.2.1 Engine Installation Mode (Prebuilt binary vs Local Source Build)
+# Unified v3.2.2 Engine Installation Mode (Prebuilt binary vs Local Source Build)
 if [[ "$ENGINE_MODE_EXPLICIT" == "0" ]]; then
     if [[ -n "$X86_PREBUILT_ASSET" ]]; then
         if [[ "$IS_INTERACTIVE" == "1" ]]; then
@@ -634,10 +634,10 @@ if [[ "$ENGINE_MODE_EXPLICIT" == "0" ]]; then
             echo "------------------------------------------------------------------------------"
             echo " ENGINE INSTALLATION MODE (Linux x86_64 — CPUID matched: ${X86_PREBUILT_ASSET})"
             echo "------------------------------------------------------------------------------"
-            echo "  1) Download precompiled v3.2.1 binary (${X86_PREBUILT_ASSET}) [Recommended, ~5s]"
+            echo "  1) Download precompiled v3.2.2 binary (${X86_PREBUILT_ASSET}) [Recommended, ~5s]"
             echo "     Unified RouteCrack 2.0 binary serving Qwen3.8, DeepSeek-V4 284B, Nemotron-30B & Inkling-2-Mini"
             echo "     (static libgomp/libstdc++, GLIBC <= 2.30; zero C++ compiler required)."
-            echo "  2) Compile unified v3.2.1 engine from source"
+            echo "  2) Compile unified v3.2.2 engine from source"
             echo "     Applies patches/llama-modchip-v3.2.patch onto pinned llama.cpp."
             echo "------------------------------------------------------------------------------"
             printf " Select engine mode [1-2, Enter=1]: "
@@ -676,17 +676,17 @@ fi
 
 echo ""
 echo "=============================================================================="
-echo " STEP 2/5: INSTALLING UNIFIED LLAMA-MODCHIP v3.2.1 ENGINE"
+echo " STEP 2/5: INSTALLING UNIFIED LLAMA-MODCHIP v3.2.2 ENGINE"
 echo "=============================================================================="
 LLAMA_BUILD_DIR="${WORKSPACE_DIR}/llama.cpp"
 
 PREBUILT_OK=0
 if [[ "$USE_PREBUILT" == "1" && -n "$X86_PREBUILT_ASSET" ]]; then
-    ASSET_URL="https://github.com/synchopate/llama-modchip/releases/download/v3.2.1/${X86_PREBUILT_ASSET}"
+    ASSET_URL="https://github.com/synchopate/llama-modchip/releases/download/v3.2.2/${X86_PREBUILT_ASSET}"
     FALLBACK_ASSET_URL="https://huggingface.co/Synchopate/Qwen3.8-Flash-Next-MaxQ-64GB-GGUF/resolve/main/${X86_PREBUILT_ASSET}"
-    EXPECTED_BIN_SHA256="d4416540f0e7fa50c42048e2ff072b37d85593c3e4bb54cf534a8024f330905b"
-    [[ "$X86_PREBUILT_ASSET" == *-avx512 ]] && EXPECTED_BIN_SHA256="6cc390594f9906b18866eb0d3af534fcb2d3fa486d8b7193aa93597c703886c7"
-    echo "[*] CPUID selected portable v3.2.1 precompiled binary: ${X86_PREBUILT_ASSET}"
+    EXPECTED_BIN_SHA256="9465fa9c21eabf8b843997e95537b5b545313e8181b25cbfd3a6449549b827d8"
+    [[ "$X86_PREBUILT_ASSET" == *-avx512 ]] && EXPECTED_BIN_SHA256="c673cad9e7aa45e2351e92247ebf9791a934b835cf6a1f3e9c7e46f27b25bdc6"
+    echo "[*] CPUID selected portable v3.2.2 precompiled binary: ${X86_PREBUILT_ASSET}"
     if curl -fL --progress-bar -o "${WORKSPACE_DIR}/bin/llama-server-nemotron.part" "$ASSET_URL" \
         || curl -fL --progress-bar -o "${WORKSPACE_DIR}/bin/llama-server-nemotron.part" "$FALLBACK_ASSET_URL"; then
         ACTUAL_BIN_SHA256="$(compute_sha256 "${WORKSPACE_DIR}/bin/llama-server-nemotron.part")"
@@ -706,7 +706,7 @@ if [[ "$USE_PREBUILT" == "1" && -n "$X86_PREBUILT_ASSET" ]]; then
             # Purge any stale pre-v3.0 RouteCrack helpers and old v2.x shared libs (libggml/libllama)
             rm -f "${WORKSPACE_DIR}/bin/rc_tokenize_nemotron" "${WORKSPACE_DIR}/bin/rc_build_tables"
             rm -f "${LLAMA_BUILD_DIR}/build/bin"/libggml* "${LLAMA_BUILD_DIR}/build/bin"/libllama* "${LLAMA_BUILD_DIR}/build/bin"/libmtmd* 2>/dev/null || true
-            echo "[+] Installed & verified prebuilt v3.2.1 binary: ${WORKSPACE_DIR}/bin/llama-server-nemotron (${X86_PREBUILT_ASSET}, SHA-256 + --version OK)"
+            echo "[+] Installed & verified prebuilt v3.2.2 binary: ${WORKSPACE_DIR}/bin/llama-server-nemotron (${X86_PREBUILT_ASSET}, SHA-256 + --version OK)"
             PREBUILT_OK=1
         fi
     else
@@ -727,7 +727,7 @@ if [[ "$PREBUILT_OK" == "0" ]]; then
     cp -f "${LLAMA_BUILD_DIR}/build/bin/llama-quantize" "${WORKSPACE_DIR}/bin/llama-quantize" 2>/dev/null || true
     cp -f "${LLAMA_BUILD_DIR}/build/bin/llama-perplexity" "${WORKSPACE_DIR}/bin/llama-perplexity" 2>/dev/null || true
     cp -f "${LLAMA_BUILD_DIR}/build/bin/llama-bench" "${WORKSPACE_DIR}/bin/llama-bench" 2>/dev/null || true
-    echo "[+] Installed unified v3.2.1 binary: ${WORKSPACE_DIR}/bin/llama-server-nemotron"
+    echo "[+] Installed unified v3.2.2 binary: ${WORKSPACE_DIR}/bin/llama-server-nemotron"
 fi
 
 if [[ "$PREBUILT_OK" == "0" && "$MODEL_FAMILY" == "nemotron" && -d "${LLAMA_BUILD_DIR}/include" ]]; then
@@ -912,7 +912,7 @@ fi
 
 echo ""
 echo "=============================================================================="
-echo " STEP 5/5: GENERATING AUTO-TUNED v3.2.1 LAUNCH SCRIPTS"
+echo " STEP 5/5: GENERATING AUTO-TUNED v3.2.2 LAUNCH SCRIPTS"
 echo "=============================================================================="
 if [[ "$MODEL_FAMILY" == "qwen38" || "$MODEL_FAMILY" == "inkling2" ]]; then
     CTX_SIZE=32768
@@ -942,7 +942,7 @@ fi
 
 cat > "${REPO_ROOT}/start_server.sh" <<EOF
 #!/usr/bin/env bash
-# Auto-generated by install.sh (llama-modchip v3.2.1)
+# Auto-generated by install.sh (llama-modchip v3.2.2)
 # Usage: ./start_server.sh [/path/to/model.gguf] [extra llama-server flags]
 set -euo pipefail
 
@@ -1158,7 +1158,7 @@ mkdir -p "\$SLOT_SAVE_DIR" 2>/dev/null || true
 
 LOAD_MODE="\${MODCHIP_LOAD_MODE:-\${DEFAULT_LOAD_MODE}}"
 
-# Default --repack ON across v3.2.1 (zero-copy 3D MoE mmap preserved on Qwen3.8 + VNNI/AVX2 dense tile repack)
+# Default --repack ON across v3.2.2 (zero-copy 3D MoE mmap preserved on Qwen3.8 + VNNI/AVX2 dense tile repack)
 REPACK_ARGS=()
 [[ "\${USE_REPACK:-1}" == "1" ]] && REPACK_ARGS=(--repack)
 
@@ -1173,7 +1173,7 @@ EXTRA_ARGS_ARR=()
 if [[ -n "\${EXTRA_SERVER_ARGS:-}" ]]; then
     read -r -a EXTRA_ARGS_ARR <<< "\${EXTRA_SERVER_ARGS}"
 fi
-echo "[*] Starting llama-server v3.2.1 on http://\${SERVER_HOST}:\${SERVER_PORT} (Arch: \${MODEL_ARCH}, Decode: \${DECODE_THREADS}T / Prefill: \${BATCH_THREADS}T [mask: \${TASKSET_MASK}, poll=0], RC_TABLES_DIR=\${RC_TABLES_DIR}, Context: \${EFFECTIVE_CTX_SIZE})..."
+echo "[*] Starting llama-server v3.2.2 on http://\${SERVER_HOST}:\${SERVER_PORT} (Arch: \${MODEL_ARCH}, Decode: \${DECODE_THREADS}T / Prefill: \${BATCH_THREADS}T [mask: \${TASKSET_MASK}, poll=0], RC_TABLES_DIR=\${RC_TABLES_DIR}, Context: \${EFFECTIVE_CTX_SIZE})..."
 exec \${LAUNCH_PREFIX[@]+"\${LAUNCH_PREFIX[@]}"} "${WORKSPACE_DIR}/bin/llama-server-nemotron" \\
   --model "\$MODEL" \\
   --port "\${SERVER_PORT}" \\
@@ -1222,7 +1222,7 @@ EOF
 chmod +x "${REPO_ROOT}/start_gateway.sh"
 
 echo "=============================================================================="
-echo " [+] LLAMA-MODCHIP v3.2.1 INSTALLATION COMPLETE!"
+echo " [+] LLAMA-MODCHIP v3.2.2 INSTALLATION COMPLETE!"
 echo "=============================================================================="
 echo " Quickest way to start & chat (Unified ./modchip CLI):"
 echo "      ./modchip start        # Starts server + gateway in background"

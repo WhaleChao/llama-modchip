@@ -1,4 +1,4 @@
-﻿# Builds the desktop preset tree for llama-modchip v3.2.1:
+﻿# Builds the desktop preset tree for llama-modchip v3.2.2:
 #   Desktop\Modchip Presets\<ctx>\fast|exact.lnk
 # Re-run any time: powershell -ExecutionPolicy Bypass -File windows\make_shortcuts.ps1
 
@@ -79,7 +79,7 @@ New-Link -lnk (Join-Path $Root "STOP llama-modchip server.lnk") -target (Join-Pa
 $made += (Join-Path $Root "STOP llama-modchip server.lnk")
 
 $readme = @"
-llama-modchip v3.2.1 -- Windows Desktop Presets (Qwen3.8 / DeepSeek-V4 MaxQ-v4 / Nemotron)
+llama-modchip v3.2.2 -- Windows Desktop Presets (Qwen3.8 / DeepSeek-V4 MaxQ-v4 / Nemotron)
 
 Folders correspond to context window length:
   32K / 64K / 128K / 256K / 512K / 1M

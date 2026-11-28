@@ -130,9 +130,9 @@ $$\mathbf{h} = \text{SiLU}(\mathbf{W}_{\text{gate}} \mathbf{x}) \odot (\mathbf{W
 
 ---
 
-## 5. Shipped 64 GB `0731` Checkpoints: `v3.2.1` Donor-Free `MaxQ-v4` (`57.99 GiB`, 100% Standard `ggml`) & Historical `v2.5.x` Series
+## 5. Shipped 64 GB `0731` Checkpoints: `v3.2.2` Donor-Free `MaxQ-v4` (`57.99 GiB`, 100% Standard `ggml`) & Historical `v2.5.x` Series
 
-In **`v3.2.1`**, the single recommended and default 64 GB `DeepSeek-V4-Flash-0731` checkpoint (`./install.sh --preset dsv4-maxq`) is **[`DeepSeek-V4-Flash-0731-MaxQ-v4`](https://huggingface.co/Synchopate/DeepSeek-V4-Flash-0731-MaxQ-v4-64GB-CPU-GGUF)** (`57.99 GiB` / `62,270,037,248 B`), built 100% donor-free using **100% standard `ggml` tensor types (`0` custom types)** with `34`-layer `2048 -> 1792` ConeCollapse (`ffn_down_exps.bias`, requiring `llama-modchip v3.1.1+` loader) and FP64 Woodbury DualGram (`wiki-alt.txt` 51-chunk `PPL = 6.8592`, `KLD = 0.6485`, `Top-1 = 73.28%`; see [`benchmarks/QUALITY_GATE_VQ3_64.md`](../benchmarks/QUALITY_GATE_VQ3_64.md)).
+In **`v3.2.2`**, the single recommended and default 64 GB `DeepSeek-V4-Flash-0731` checkpoint (`./install.sh --preset dsv4-maxq`) is **[`DeepSeek-V4-Flash-0731-MaxQ-v4`](https://huggingface.co/Synchopate/DeepSeek-V4-Flash-0731-MaxQ-v4-64GB-CPU-GGUF)** (`57.99 GiB` / `62,270,037,248 B`), built 100% donor-free using **100% standard `ggml` tensor types (`0` custom types)** with `34`-layer `2048 -> 1792` ConeCollapse (`ffn_down_exps.bias`, requiring `llama-modchip v3.1.1+` loader) and FP64 Woodbury DualGram (`wiki-alt.txt` 51-chunk `PPL = 6.8592`, `KLD = 0.6485`, `Top-1 = 73.28%`; see [`benchmarks/QUALITY_GATE_VQ3_64.md`](../benchmarks/QUALITY_GATE_VQ3_64.md)).
 
 For historical comparison only, `v2.5.x` shipped earlier 3-shard checkpoints using retired pre-`v3.0` custom IDs (withdrawn from Hugging Face in Nov 2026 in favor of `MaxQ-v4`; legacy `dsv4-maxq-fractal` / `dsv4-vq3` / `dsv4-fractal` / `dsv4-ablit` presets in `install.sh` redirect cleanly to `dsv4-maxq` `MaxQ-v4`):
 
@@ -144,10 +144,10 @@ For historical comparison only, `v2.5.x` shipped earlier 3-shard checkpoints usi
   - Single-pass `1,328`-tensor layout on `prem-research/DeepSeek-V4-Flash-0731-abliterated` (`WikiText-2` `11.3944 ± 0.5650`, `70.0 / 80` Functional Gate).
 
 ```bash
-# Install & SHA-256 verify the recommended v3.2.1 100%-standard-ggml DeepSeek-V4-Flash MaxQ-v4 checkpoint (57.99 GiB):
+# Install & SHA-256 verify the recommended v3.2.2 100%-standard-ggml DeepSeek-V4-Flash MaxQ-v4 checkpoint (57.99 GiB):
 ./install.sh --preset dsv4-maxq --yes
 
-# Or build the unified llama-modchip v3.2.1 engine from source (llama.cpp 46eb1742d + patches/llama-modchip-v3.2.patch):
+# Or build the unified llama-modchip v3.2.2 engine from source (llama.cpp 46eb1742d + patches/llama-modchip-v3.2.patch):
 BUILD_TESTS=1 ./scripts/build_zen5_llama.sh ./workspace/llama.cpp
 ```
 

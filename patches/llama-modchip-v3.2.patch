@@ -1,5 +1,5 @@
 diff --git a/common/arg.cpp b/common/arg.cpp
-index a63823767..303564c24 100644
+index a638237..303564c 100644
 --- a/common/arg.cpp
 +++ b/common/arg.cpp
 @@ -343,7 +343,10 @@ common_models_handler common_models_handler_init(const common_params & params, l
@@ -72,7 +72,7 @@ index a63823767..303564c24 100644
          {"--spec-ngram-size-n"}, "N",
          "the argument has been removed. use the respective --spec-ngram-*-size-n or --spec-ngram-mod-n-match",
 diff --git a/common/common.cpp b/common/common.cpp
-index b009d460d..c85796f63 100644
+index b009d46..c85796f 100644
 --- a/common/common.cpp
 +++ b/common/common.cpp
 @@ -1246,7 +1246,9 @@ void common_fit_apply(common_params & params, llama_model_params & mparams, llam
@@ -98,7 +98,7 @@ index b009d460d..c85796f63 100644
      return mparams;
  }
 diff --git a/common/common.h b/common/common.h
-index a8e89ed2d..f2d3b8637 100644
+index a8e89ed..f2d3b86 100644
 --- a/common/common.h
 +++ b/common/common.h
 @@ -187,6 +187,7 @@ enum common_speculative_type {
@@ -142,7 +142,7 @@ index a8e89ed2d..f2d3b8637 100644
  };
  
 diff --git a/common/fit.cpp b/common/fit.cpp
-index 7ab89cc09..cc383ae23 100644
+index 7ab89cc..cc383ae 100644
 --- a/common/fit.cpp
 +++ b/common/fit.cpp
 @@ -76,6 +76,12 @@ static std::vector<llama_device_memory_data> common_get_device_memory_data_impl(
@@ -159,7 +159,7 @@ index 7ab89cc09..cc383ae23 100644
      if (ctx == nullptr) {
          llama_model_free(model);
 diff --git a/common/ngram-map.cpp b/common/ngram-map.cpp
-index d1cb4519f..3fa90f57f 100644
+index d1cb451..3fa90f5 100644
 --- a/common/ngram-map.cpp
 +++ b/common/ngram-map.cpp
 @@ -1,536 +1,1026 @@
@@ -1604,7 +1604,7 @@ index d1cb4519f..3fa90f57f 100644
 +    }
  }
 diff --git a/common/ngram-map.h b/common/ngram-map.h
-index 97608ef17..8ced2762e 100644
+index 97608ef..8ced276 100644
 --- a/common/ngram-map.h
 +++ b/common/ngram-map.h
 @@ -80,6 +80,7 @@ struct common_ngram_map {
@@ -1617,7 +1617,7 @@ index 97608ef17..8ced2762e 100644
      size_t   last_draft_key_idx   = 0; // index of last key used for draft generation (0 = no draft)
 diff --git a/common/rc_arbiter_l1.h b/common/rc_arbiter_l1.h
 new file mode 100644
-index 000000000..3b08212d2
+index 0000000..3b08212
 --- /dev/null
 +++ b/common/rc_arbiter_l1.h
 @@ -0,0 +1,298 @@
@@ -1921,7 +1921,7 @@ index 000000000..3b08212d2
 +#endif // RC_ARBITER_L1_H
 diff --git a/common/rc_predictor.h b/common/rc_predictor.h
 new file mode 100644
-index 000000000..99d519b83
+index 0000000..99d519b
 --- /dev/null
 +++ b/common/rc_predictor.h
 @@ -0,0 +1,1658 @@
@@ -3585,7 +3585,7 @@ index 000000000..99d519b83
 +#endif // RC_PREDICTOR_H
 diff --git a/common/rc_routecrack2.h b/common/rc_routecrack2.h
 new file mode 100644
-index 000000000..362ae07b3
+index 0000000..362ae07
 --- /dev/null
 +++ b/common/rc_routecrack2.h
 @@ -0,0 +1,1791 @@
@@ -5382,7 +5382,7 @@ index 000000000..362ae07b3
 +#endif // RC_ROUTECRACK2_H
 diff --git a/common/rc_stockfish.h b/common/rc_stockfish.h
 new file mode 100644
-index 000000000..8d3112ab6
+index 0000000..8d3112a
 --- /dev/null
 +++ b/common/rc_stockfish.h
 @@ -0,0 +1,139 @@
@@ -5527,7 +5527,7 @@ index 000000000..8d3112ab6
 +#endif // RC_STOCKFISH_H
 diff --git a/common/rc_trie_v2.h b/common/rc_trie_v2.h
 new file mode 100644
-index 000000000..3dfcd103b
+index 0000000..3dfcd10
 --- /dev/null
 +++ b/common/rc_trie_v2.h
 @@ -0,0 +1,191 @@
@@ -5723,7 +5723,7 @@ index 000000000..3dfcd103b
 +    }
 +};
 diff --git a/common/speculative.cpp b/common/speculative.cpp
-index b40eb5535..dd6e8f799 100644
+index b40eb55..dd6e8f7 100644
 --- a/common/speculative.cpp
 +++ b/common/speculative.cpp
 @@ -8,8 +8,11 @@
@@ -6375,7 +6375,7 @@ index b40eb5535..dd6e8f799 100644
              default:
                  return true;
 diff --git a/ggml/include/ggml.h b/ggml/include/ggml.h
-index 7c5b1e552..3449fe218 100644
+index 7c5b1e5..3449fe2 100644
 --- a/ggml/include/ggml.h
 +++ b/ggml/include/ggml.h
 @@ -258,9 +258,11 @@ extern "C" {
@@ -6436,7 +6436,7 @@ index 7c5b1e552..3449fe218 100644
  
      enum ggml_tri_type {
 diff --git a/ggml/src/CMakeLists.txt b/ggml/src/CMakeLists.txt
-index eee1a460d..b5ac6862e 100644
+index eee1a46..b5ac686 100644
 --- a/ggml/src/CMakeLists.txt
 +++ b/ggml/src/CMakeLists.txt
 @@ -339,8 +339,32 @@ if (GGML_OPENMP_FETCH)
@@ -6475,7 +6475,7 @@ index eee1a460d..b5ac6862e 100644
      else()
          set(GGML_OPENMP_ENABLED "OFF" CACHE INTERNAL "")
 diff --git a/ggml/src/ggml-common.h b/ggml/src/ggml-common.h
-index 1dbbe326d..183a4c0a3 100644
+index 1dbbe32..183a4c0 100644
 --- a/ggml/src/ggml-common.h
 +++ b/ggml/src/ggml-common.h
 @@ -191,6 +191,24 @@ typedef struct {
@@ -6504,7 +6504,7 @@ index 1dbbe326d..183a4c0a3 100644
  typedef struct {
      ggml_half d;           // delta
 diff --git a/ggml/src/ggml-cpu/arch/x86/quants.c b/ggml/src/ggml-cpu/arch/x86/quants.c
-index 594da2683..29b5b58a7 100644
+index 594da26..29b5b58 100644
 --- a/ggml/src/ggml-cpu/arch/x86/quants.c
 +++ b/ggml/src/ggml-cpu/arch/x86/quants.c
 @@ -22,6 +22,17 @@
@@ -10279,7 +10279,7 @@ index 594da2683..29b5b58a7 100644
 +#endif
 +#endif
 diff --git a/ggml/src/ggml-cpu/arch/x86/repack.cpp b/ggml/src/ggml-cpu/arch/x86/repack.cpp
-index af1cebad1..3fe658f09 100644
+index af1ceba..3fe658f 100644
 --- a/ggml/src/ggml-cpu/arch/x86/repack.cpp
 +++ b/ggml/src/ggml-cpu/arch/x86/repack.cpp
 @@ -631,7 +631,7 @@ static void gemv_q4_b32_8x8_q8_0_lut_avx(int n, float * GGML_RESTRICT s, size_t
@@ -10382,7 +10382,7 @@ index af1cebad1..3fe658f09 100644
  
                      // Multiply with appropriate scales and accumulate (for both d and dmin) below
 diff --git a/ggml/src/ggml-cpu/ggml-cpu-impl.h b/ggml/src/ggml-cpu/ggml-cpu-impl.h
-index f8b363728..24fea6997 100644
+index f8b3637..24fea69 100644
 --- a/ggml/src/ggml-cpu/ggml-cpu-impl.h
 +++ b/ggml/src/ggml-cpu/ggml-cpu-impl.h
 @@ -535,6 +535,14 @@ void ggml_barrier(struct ggml_threadpool * tp);
@@ -10401,7 +10401,7 @@ index f8b363728..24fea6997 100644
  }
  #endif
 diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
-index 4d9760bad..824677f0a 100644
+index 4d9760b..824677f 100644
 --- a/ggml/src/ggml-cpu/ggml-cpu.c
 +++ b/ggml/src/ggml-cpu/ggml-cpu.c
 @@ -1,3 +1,30 @@
@@ -12279,7 +12279,7 @@ index 4d9760bad..824677f0a 100644
              ggml_graph_compute_thread(&threadpool->workers[ith]);
          }
 diff --git a/ggml/src/ggml-cpu/ops.cpp b/ggml/src/ggml-cpu/ops.cpp
-index cd8134740..1cb18de93 100644
+index cd81347..1cb18de 100644
 --- a/ggml/src/ggml-cpu/ops.cpp
 +++ b/ggml/src/ggml-cpu/ops.cpp
 @@ -12,6 +12,10 @@
@@ -13624,7 +13624,7 @@ index cd8134740..1cb18de93 100644
          }
      }
 diff --git a/ggml/src/ggml-cpu/quants.c b/ggml/src/ggml-cpu/quants.c
-index 44ea9fae5..bc303a337 100644
+index 44ea9fa..bc303a3 100644
 --- a/ggml/src/ggml-cpu/quants.c
 +++ b/ggml/src/ggml-cpu/quants.c
 @@ -8,6 +8,12 @@
@@ -14334,7 +14334,7 @@ index 44ea9fae5..bc303a337 100644
 +#endif
 +}
 diff --git a/ggml/src/ggml-cpu/quants.h b/ggml/src/ggml-cpu/quants.h
-index f04be52f5..392d899cf 100644
+index f04be52..392d899 100644
 --- a/ggml/src/ggml-cpu/quants.h
 +++ b/ggml/src/ggml-cpu/quants.h
 @@ -41,6 +41,10 @@ void quantize_row_iq4_xs (const float * GGML_RESTRICT x, void * GGML_RESTRICT y,
@@ -14434,7 +14434,7 @@ index f04be52f5..392d899cf 100644
  }
  #endif
 diff --git a/ggml/src/ggml-cpu/repack.cpp b/ggml/src/ggml-cpu/repack.cpp
-index 9282ca299..6e24a5a93 100644
+index 9282ca2..6e24a5a 100644
 --- a/ggml/src/ggml-cpu/repack.cpp
 +++ b/ggml/src/ggml-cpu/repack.cpp
 @@ -15,6 +15,7 @@
@@ -14476,7 +14476,7 @@ index 9282ca299..6e24a5a93 100644
      static const ggml::cpu::repack::tensor_traits<block_q1_0, 4, 4, GGML_TYPE_Q8_0> q1_0_4x4_q8_0;
      static const ggml::cpu::repack::tensor_traits<block_q1_0, 8, 4, GGML_TYPE_Q8_0> q1_0_4x8_q8_0;
 diff --git a/ggml/src/ggml-cpu/tiled/tiled.cpp b/ggml/src/ggml-cpu/tiled/tiled.cpp
-index 77e1a9945..d21318231 100644
+index 77e1a99..d213182 100644
 --- a/ggml/src/ggml-cpu/tiled/tiled.cpp
 +++ b/ggml/src/ggml-cpu/tiled/tiled.cpp
 @@ -854,7 +854,7 @@ static void ggml_compute_forward_mul_mat_id_tiled_one_expert(
@@ -14531,7 +14531,7 @@ index 77e1a9945..d21318231 100644
      }
      ws_base = (char *) (((uintptr_t) ws_base + 63) & ~(uintptr_t) 63);
 diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
-index 3e1f167e9..c96ab78b9 100644
+index 3e1f167..c96ab78 100644
 --- a/ggml/src/ggml-cuda/ggml-cuda.cu
 +++ b/ggml/src/ggml-cuda/ggml-cuda.cu
 @@ -6334,6 +6334,14 @@ static ggml_backend_buffer_type_t ggml_backend_cuda_device_get_host_buffer_type(
@@ -14550,7 +14550,7 @@ index 3e1f167e9..c96ab78b9 100644
  
      // check if all the sources are allocated on this device
 diff --git a/ggml/src/ggml-metal/ggml-metal-common.cpp b/ggml/src/ggml-metal/ggml-metal-common.cpp
-index f36312254..9bd54ae50 100644
+index f363122..9bd54ae 100644
 --- a/ggml/src/ggml-metal/ggml-metal-common.cpp
 +++ b/ggml/src/ggml-metal/ggml-metal-common.cpp
 @@ -84,6 +84,7 @@ static bool ggml_metal_mul_mv_mma_type_supported(enum ggml_type type) {
@@ -14570,7 +14570,7 @@ index f36312254..9bd54ae50 100644
          case GGML_TYPE_Q5_0:
          case GGML_TYPE_Q5_1:
 diff --git a/ggml/src/ggml-metal/ggml-metal-device.cpp b/ggml/src/ggml-metal/ggml-metal-device.cpp
-index cd9e07850..45c656304 100644
+index cd9e078..45c6563 100644
 --- a/ggml/src/ggml-metal/ggml-metal-device.cpp
 +++ b/ggml/src/ggml-metal/ggml-metal-device.cpp
 @@ -1073,6 +1073,12 @@ ggml_metal_pipeline_with_params ggml_metal_library_get_pipeline_mul_mv(ggml_meta
@@ -14600,7 +14600,7 @@ index cd9e07850..45c656304 100644
              {
                  nsg = N_SG_Q4_0;
 diff --git a/ggml/src/ggml-metal/ggml-metal-device.m b/ggml/src/ggml-metal/ggml-metal-device.m
-index 2e085453a..377cfa2ec 100644
+index 2e08545..377cfa2 100644
 --- a/ggml/src/ggml-metal/ggml-metal-device.m
 +++ b/ggml/src/ggml-metal/ggml-metal-device.m
 @@ -1529,6 +1529,7 @@ static bool ggml_metal_supports_mul_mat_op(
@@ -14630,7 +14630,7 @@ index 2e085453a..377cfa2ec 100644
              {
                  if (op->src[0]->type == GGML_TYPE_F16) {
 diff --git a/ggml/src/ggml-metal/ggml-metal-impl.h b/ggml/src/ggml-metal/ggml-metal-impl.h
-index aad014d83..c3532cc71 100644
+index aad014d..c3532cc 100644
 --- a/ggml/src/ggml-metal/ggml-metal-impl.h
 +++ b/ggml/src/ggml-metal/ggml-metal-impl.h
 @@ -32,6 +32,9 @@
@@ -14644,7 +14644,7 @@ index aad014d83..c3532cc71 100644
  #define N_SG_Q4_0 2
  
 diff --git a/ggml/src/ggml-metal/ggml-metal-ops.cpp b/ggml/src/ggml-metal/ggml-metal-ops.cpp
-index a7a1ef61e..fbffba553 100644
+index a7a1ef6..fbffba5 100644
 --- a/ggml/src/ggml-metal/ggml-metal-ops.cpp
 +++ b/ggml/src/ggml-metal/ggml-metal-ops.cpp
 @@ -2769,6 +2769,7 @@ int ggml_metal_op_mul_mat(ggml_metal_op_t ctx, int idx) {
@@ -14656,7 +14656,7 @@ index a7a1ef61e..fbffba553 100644
             op->src[0]->type == GGML_TYPE_Q4_1 ||
             op->src[0]->type == GGML_TYPE_Q5_0 ||
 diff --git a/ggml/src/ggml-metal/kernels/dequantize.h b/ggml/src/ggml-metal/kernels/dequantize.h
-index 54e00faf6..e765d430a 100644
+index 54e00fa..e765d43 100644
 --- a/ggml/src/ggml-metal/kernels/dequantize.h
 +++ b/ggml/src/ggml-metal/kernels/dequantize.h
 @@ -95,6 +95,70 @@ void dequantize_q1_0_t4(device const block_q1_0 * xb, short il, thread type4 & r
@@ -14731,7 +14731,7 @@ index 54e00faf6..e765d430a 100644
  void dequantize_q2_0(device const block_q2_0 * xb, short il, thread type4x4 & reg) {
      device const uint8_t * qs = xb->qs;
 diff --git a/ggml/src/ggml-metal/kernels/mul_mm.metal b/ggml/src/ggml-metal/kernels/mul_mm.metal
-index fab720097..3906fc76c 100644
+index fab7200..3906fc7 100644
 --- a/ggml/src/ggml-metal/kernels/mul_mm.metal
 +++ b/ggml/src/ggml-metal/kernels/mul_mm.metal
 @@ -899,7 +899,8 @@ template [[host_name("kernel_mul_mm_bf16_f32")]]    kernel mul_mm_t kernel_mul_m
@@ -14775,7 +14775,7 @@ index fab720097..3906fc76c 100644
  template [[host_name("kernel_mul_mm_id_q4_1_f16")]]    kernel mul_mm_id kernel_mul_mm_id<half,   half4x4,   simdgroup_half8x8,   half,   half2x4,   simdgroup_half8x8,   block_q4_1,    2,     dequantize_q4_1,    float,  float4x4,  half, half2x4>;
  template [[host_name("kernel_mul_mm_id_q5_0_f16")]]    kernel mul_mm_id kernel_mul_mm_id<half,   half4x4,   simdgroup_half8x8,   half,   half2x4,   simdgroup_half8x8,   block_q5_0,    2,     dequantize_q5_0,    float,  float4x4,  half, half2x4>;
 diff --git a/ggml/src/ggml-metal/kernels/mul_mv.metal b/ggml/src/ggml-metal/kernels/mul_mv.metal
-index de9d76ff6..da5a93c41 100644
+index de9d76f..da5a93c 100644
 --- a/ggml/src/ggml-metal/kernels/mul_mv.metal
 +++ b/ggml/src/ggml-metal/kernels/mul_mv.metal
 @@ -29,6 +29,40 @@ inline float block_q_n_dot_y(device const block_q1_0 * qb_curr, float sumy, thre
@@ -14933,7 +14933,7 @@ index de9d76ff6..da5a93c41 100644
  template [[host_name("kernel_mul_mv_id_q4_1_f32")]]    kernel kernel_mul_mv_id_t kernel_mul_mv_id<mmv_fn<mul_vec_q_n_f32_impl<block_q4_1, N_R0_Q4_1>>>;
  template [[host_name("kernel_mul_mv_id_q5_0_f32")]]    kernel kernel_mul_mv_id_t kernel_mul_mv_id<mmv_fn<mul_vec_q_n_f32_impl<block_q5_0, N_R0_Q5_0>>>;
 diff --git a/ggml/src/ggml-metal/kernels/mul_mv_mma.metal b/ggml/src/ggml-metal/kernels/mul_mv_mma.metal
-index 5cf245d52..3118cc2bf 100644
+index 5cf245d..3118cc2 100644
 --- a/ggml/src/ggml-metal/kernels/mul_mv_mma.metal
 +++ b/ggml/src/ggml-metal/kernels/mul_mv_mma.metal
 @@ -609,7 +609,8 @@ MUL_MV_MMA_GEN("q6_K", block_q6_K, QK_NL, dequantize_q6_K)
@@ -14947,7 +14947,7 @@ index 5cf245d52..3118cc2bf 100644
  MUL_MV_MMA_GEN("q2_K",    block_q2_K,    QK_NL, dequantize_q2_K)
  MUL_MV_MMA_GEN("q3_K",    block_q3_K,    QK_NL, dequantize_q3_K)
 diff --git a/ggml/src/ggml-metal/kernels/quantize.metal b/ggml/src/ggml-metal/kernels/quantize.metal
-index 663e47d5f..a1493e89d 100644
+index 663e47d..a1493e8 100644
 --- a/ggml/src/ggml-metal/kernels/quantize.metal
 +++ b/ggml/src/ggml-metal/kernels/quantize.metal
 @@ -140,7 +140,8 @@ kernel void kernel_cpy_q_f32(
@@ -14981,7 +14981,7 @@ index 663e47d5f..a1493e89d 100644
  template [[host_name("kernel_get_rows_q4_1")]]    kernel get_rows_q_t kernel_get_rows_q<block_q4_1,    2, dequantize_q4_1>;
  template [[host_name("kernel_get_rows_q5_0")]]    kernel get_rows_q_t kernel_get_rows_q<block_q5_0,    2, dequantize_q5_0>;
 diff --git a/ggml/src/ggml-opencl/ggml-opencl.cpp b/ggml/src/ggml-opencl/ggml-opencl.cpp
-index 894f8235e..def7ea1c0 100644
+index 894f823..def7ea1 100644
 --- a/ggml/src/ggml-opencl/ggml-opencl.cpp
 +++ b/ggml/src/ggml-opencl/ggml-opencl.cpp
 @@ -11954,6 +11954,14 @@ static bool ggml_cl_mul_mat_can_use_fwht(const ggml_backend_opencl_context * bac
@@ -15000,7 +15000,7 @@ index 894f8235e..def7ea1c0 100644
      ggml_backend_opencl_context *        backend_ctx = dev_ctx->backend_ctx;
  
 diff --git a/ggml/src/ggml-quants.c b/ggml/src/ggml-quants.c
-index 40ffe1e6b..6501ef6cb 100644
+index 40ffe1e..6501ef6 100644
 --- a/ggml/src/ggml-quants.c
 +++ b/ggml/src/ggml-quants.c
 @@ -2,6 +2,7 @@
@@ -15353,7 +15353,7 @@ index 40ffe1e6b..6501ef6cb 100644
              {
                  VALIDATE_ROW_DATA_D_F16_IMPL(block_q4_0, data, nb);
 diff --git a/ggml/src/ggml-quants.h b/ggml/src/ggml-quants.h
-index ca36d1369..eee78a676 100644
+index ca36d13..eee78a6 100644
 --- a/ggml/src/ggml-quants.h
 +++ b/ggml/src/ggml-quants.h
 @@ -16,6 +16,10 @@ extern "C" {
@@ -15377,7 +15377,7 @@ index ca36d1369..eee78a676 100644
  GGML_API void dequantize_row_q4_1(const block_q4_1 * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t k);
  GGML_API void dequantize_row_q5_0(const block_q5_0 * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t k);
 diff --git a/ggml/src/ggml-sycl/ggml-sycl.cpp b/ggml/src/ggml-sycl/ggml-sycl.cpp
-index 5b87fa024..071fa18d9 100644
+index 5b87fa0..071fa18 100644
 --- a/ggml/src/ggml-sycl/ggml-sycl.cpp
 +++ b/ggml/src/ggml-sycl/ggml-sycl.cpp
 @@ -7279,6 +7279,14 @@ static ggml_backend_buffer_t ggml_backend_sycl_device_buffer_from_host_ptr(ggml_
@@ -15396,7 +15396,7 @@ index 5b87fa024..071fa18d9 100644
          (ggml_backend_sycl_device_context *)dev->context;
      int device = sycl_ctx->device;
 diff --git a/ggml/src/ggml-vulkan/ggml-vulkan.cpp b/ggml/src/ggml-vulkan/ggml-vulkan.cpp
-index cc0071033..2cfa816ba 100644
+index cc00710..2cfa816 100644
 --- a/ggml/src/ggml-vulkan/ggml-vulkan.cpp
 +++ b/ggml/src/ggml-vulkan/ggml-vulkan.cpp
 @@ -16605,6 +16605,14 @@ static ggml_backend_t ggml_backend_vk_device_init(ggml_backend_dev_t dev, const
@@ -15415,7 +15415,7 @@ index cc0071033..2cfa816ba 100644
      const vk_device& device = ggml_vk_get_device(ctx->device);
  
 diff --git a/ggml/src/ggml.c b/ggml/src/ggml.c
-index b47c5addf..01e09b4c7 100644
+index b47c5ad..01e09b4 100644
 --- a/ggml/src/ggml.c
 +++ b/ggml/src/ggml.c
 @@ -699,6 +699,22 @@ static const struct ggml_type_traits type_traits[GGML_TYPE_COUNT] = {
@@ -15465,7 +15465,7 @@ index b47c5addf..01e09b4c7 100644
          case GGML_TYPE_Q5_0:    result = quantize_q5_0   (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
 diff --git a/ggml/src/vq3_codebook.h b/ggml/src/vq3_codebook.h
 new file mode 100644
-index 000000000..ee684a08f
+index 0000000..ee684a0
 --- /dev/null
 +++ b/ggml/src/vq3_codebook.h
 @@ -0,0 +1,231 @@
@@ -15701,7 +15701,7 @@ index 000000000..ee684a08f
 +
 +#endif // GGML_VQ3_CODEBOOK_H
 diff --git a/include/llama.h b/include/llama.h
-index 7122143e5..f4b1a0bd2 100644
+index 7122143..f4b1a0b 100644
 --- a/include/llama.h
 +++ b/include/llama.h
 @@ -159,9 +159,12 @@ extern "C" {
@@ -15718,7 +15718,7 @@ index 7122143e5..f4b1a0bd2 100644
      // Get the model file type (quantization) as a string, e.g. "Q8_0" or "Q4_K - Medium"
      LLAMA_API const char * llama_ftype_name(enum llama_ftype ftype);
 diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
-index 269b920fb..baa8dc5f3 100644
+index 269b920..baa8dc5 100644
 --- a/src/llama-graph.cpp
 +++ b/src/llama-graph.cpp
 @@ -1,4 +1,5 @@
@@ -16002,7 +16002,7 @@ index 269b920fb..baa8dc5f3 100644
  
 diff --git a/src/llama-inkling2-fused.h b/src/llama-inkling2-fused.h
 new file mode 100644
-index 000000000..5ed8341c5
+index 0000000..5ed8341
 --- /dev/null
 +++ b/src/llama-inkling2-fused.h
 @@ -0,0 +1,2433 @@
@@ -18440,7 +18440,7 @@ index 000000000..5ed8341c5
 +
 +} // namespace modchip_ink2
 diff --git a/src/llama-kv-cache-dsv4.cpp b/src/llama-kv-cache-dsv4.cpp
-index 9c0a9b22d..3709c99c3 100644
+index 9c0a9b2..3709c99 100644
 --- a/src/llama-kv-cache-dsv4.cpp
 +++ b/src/llama-kv-cache-dsv4.cpp
 @@ -574,7 +574,7 @@ static llama_kv_cache_dsv4_context::comp_plan dsv4_build_comp_plan(
@@ -18453,7 +18453,7 @@ index 9c0a9b22d..3709c99c3 100644
              if (overlap) {
                  for (uint32_t j = 0; j < ratio; ++j) {
 diff --git a/src/llama-mmap.cpp b/src/llama-mmap.cpp
-index 02e4ede7c..b1fa161a9 100644
+index 02e4ede..b1fa161 100644
 --- a/src/llama-mmap.cpp
 +++ b/src/llama-mmap.cpp
 @@ -722,6 +722,28 @@ struct llama_mmap::impl {
@@ -18486,7 +18486,7 @@ index 02e4ede7c..b1fa161a9 100644
          // page-aligned madvise over [beg, end), clamped to the file
          auto advise = [&](size_t beg, size_t end, int advice, const char * name) {
 diff --git a/src/llama-model-loader.cpp b/src/llama-model-loader.cpp
-index 808fb44d8..c664b149f 100644
+index 808fb44..c664b14 100644
 --- a/src/llama-model-loader.cpp
 +++ b/src/llama-model-loader.cpp
 @@ -39,8 +39,10 @@ const char * llama_ftype_name(llama_ftype ftype) {
@@ -18527,7 +18527,7 @@ index 808fb44d8..c664b149f 100644
                  {
                      LLAMA_LOG_WARN("%s: unknown type %s\n", __func__, ggml_type_name(type_max));
 diff --git a/src/llama-quant.cpp b/src/llama-quant.cpp
-index 0515756dc..d7be045d0 100644
+index 0515756..d7be045 100644
 --- a/src/llama-quant.cpp
 +++ b/src/llama-quant.cpp
 @@ -485,6 +485,8 @@ static ggml_type tensor_type_fallback(quantize_state_impl & qs, const ggml_tenso
@@ -18560,7 +18560,7 @@ index 0515756dc..d7be045d0 100644
          case LLAMA_FTYPE_MOSTLY_MXFP4_MOE: return GGML_TYPE_MXFP4;
  
 diff --git a/src/models/deepseek4.cpp b/src/models/deepseek4.cpp
-index 69ebe5a60..f56b0a22a 100644
+index 69ebe5a..f56b0a2 100644
 --- a/src/models/deepseek4.cpp
 +++ b/src/models/deepseek4.cpp
 @@ -22,7 +22,24 @@ void llama_model_deepseek4::load_arch_hparams(llama_model_loader & ml) {
@@ -18806,8 +18806,260 @@ index 69ebe5a60..f56b0a22a 100644
              layer.ffn_exp_probs_b,
              n_expert, hparams.n_expert_used(),
              LLM_FFN_SILU, hparams.expert_weights_norm,
+diff --git a/src/models/inkling2-loop.cpp b/src/models/inkling2-loop.cpp
+index 0de66ba..28e2157 100644
+--- a/src/models/inkling2-loop.cpp
++++ b/src/models/inkling2-loop.cpp
+@@ -1,7 +1,139 @@
+ #include "models.h"
++#include "../llama-inkling2-fused.h"
++#include <algorithm>
++#include <cmath>
++#include <cstdlib>
++#include <cstring>
++#include <deque>
++#include <limits>
++#include <mutex>
++
++namespace {
++
++// Opt-in LoopCD (arXiv:2610.02185) for Inkling-2-Mini looped transformer.
++// Default when unset: 100% disabled (bit-identical to baseline 3-pass inference).
++//   MODCHIP_LOOPCD_MODE=adaptive  -> Eq. 4 margin-gated LoopCD-Logits (default omega=0.50, ref=0)
++//   MODCHIP_LOOPCD_MODE=logits    -> Eq. 3 fixed LoopCD-Logits        (default omega=0.50, ref=0)
++//   MODCHIP_LOOPCD_MODE=hidden    -> Eq. 2 zero-overhead LoopCD-Hidden(default omega=0.40, ref=1)
++//   MODCHIP_LOOPCD_MODE=off       -> explicitly disabled
++int get_loopcd_mode() {
++    if (const char * env_m = std::getenv("MODCHIP_LOOPCD_MODE"); env_m && env_m[0]) {
++        if (std::strcmp(env_m, "logits") == 0)   return 1;
++        if (std::strcmp(env_m, "adaptive") == 0) return 2;
++        if (std::strcmp(env_m, "hidden") == 0)   return 3;
++        if (std::strcmp(env_m, "off") == 0 || std::strcmp(env_m, "0") == 0 || std::strcmp(env_m, "none") == 0) {
++            return -1;
++        }
++    }
++    return 0; // unset: disabled unless MODCHIP_LOOPCD_OMEGA != 0 (hidden)
++}
++
++float get_loopcd_omega(int mode) {
++    if (mode == -1) {
++        return 0.0f;
++    }
++    if (const char * env_w = std::getenv("MODCHIP_LOOPCD_OMEGA"); env_w && env_w[0]) {
++        const float v = std::strtof(env_w, nullptr);
++        return std::isfinite(v) ? v : 0.0f;
++    }
++    if (mode == 1) return 0.50f;
++    if (mode == 2) return 0.50f;
++    if (mode == 3) return 0.40f;
++    return 0.0f;
++}
++
++int get_loopcd_ref(int mode) {
++    if (const char * env_r = std::getenv("MODCHIP_LOOPCD_REF"); env_r && env_r[0]) {
++        const int r = std::atoi(env_r);
++        return r > 0 ? r : 0;
++    }
++    return (mode == 3) ? 1 : 0;
++}
++
++bool get_loopcd_blocks() {
++    if (const char * env_b = std::getenv("MODCHIP_LOOPCD_BLOCKS"); env_b && env_b[0]) {
++        return std::atoi(env_b) != 0;
++    }
++    return true;
++}
++
++struct loopcd_logits_params {
++    float omega;
++    int   adaptive;
++};
++
++void * intern_loopcd_params(float omega, int adaptive) {
++    static std::mutex mu;
++    static std::deque<loopcd_logits_params> pool;
++    std::lock_guard<std::mutex> lock(mu);
++    for (auto & p : pool) {
++        if (p.omega == omega && p.adaptive == adaptive) {
++            return &p;
++        }
++    }
++    pool.push_back({omega, adaptive});
++    return &pool.back();
++}
++
++void loopcd_combine_logits_op(struct ggml_tensor * dst, int ith, int nth, void * userdata) {
++    const struct ggml_tensor * src0 = dst->src[0];
++    const struct ggml_tensor * src1 = dst->src[1];
++    const auto * p = (const loopcd_logits_params *) userdata;
++
++    const int64_t V = dst->ne[0];
++    const int64_t N = dst->ne[1];
++    if (V <= 0 || N <= 0) {
++        return;
++    }
++    for (int64_t r = ith; r < N; r += nth) {
++        const float * zR = (const float *) ((const char *) src0->data + r * src0->nb[1]);
++        const float * z1 = (const float *) ((const char *) src1->data + r * src1->nb[1]);
++        float       * zo = (float *)       ((char *)       dst->data  + r * dst->nb[1]);
++
++        float w = p->omega;
++        if (p->adaptive) {
++            float max1 = -std::numeric_limits<float>::infinity();
++            float max2 = -std::numeric_limits<float>::infinity();
++            for (int64_t v = 0; v < V; ++v) {
++                const float val = zR[v];
++                if (val >= max1) {
++                    max2 = max1;
++                    max1 = val;
++                } else if (val > max2) {
++                    max2 = val;
++                }
++            }
++            if (std::isfinite(max1)) {
++                double sum_exp = 0.0;
++                for (int64_t v = 0; v < V; ++v) {
++                    sum_exp += std::exp((double) (zR[v] - max1));
++                }
++                if (sum_exp > 0.0 && std::isfinite(sum_exp)) {
++                    const float p1 = (float) (1.0 / sum_exp);
++                    const float p2 = std::isfinite(max2) ? (float) (std::exp((double) (max2 - max1)) / sum_exp) : 0.0f;
++                    const float margin = std::clamp(p1 - p2, 0.0f, 1.0f);
++                    w = p->omega * (1.0f - margin);
++                }
++            }
++        }
++
++        for (int64_t v = 0; v < V; ++v) {
++            zo[v] = zR[v] + w * (zR[v] - z1[v]);
++        }
++    }
++}
++
++} // namespace
++
+ 
+ int llama_model_inkling2_loop::layer_phys(int il) const {
+-    return il < n_phys ? il : core_start + (il - n_phys) % (core_end - core_start);
++    if (il < n_phys) {
++        return il;
++    }
++    if (loopcd_aux_base > 0 && il >= loopcd_aux_base) {
++        return (int) core_end + (il - loopcd_aux_base);
++    }
++    return (int) core_start + (il - n_phys) % (int) (core_end - core_start);
+ }
+ 
+ void llama_model_inkling2_loop::load_arch_hparams(llama_model_loader & ml) {
+@@ -10,6 +142,15 @@ void llama_model_inkling2_loop::load_arch_hparams(llama_model_loader & ml) {
+     ml.get_key(LLM_KV_LOOP_START,     core_start);
+     ml.get_key(LLM_KV_LOOP_END,       core_end);
+     ml.get_key(LLM_KV_LOOP_COUNT,     n_passes);
++    if (const char * env_loops = std::getenv("MODCHIP_INK2_LOOPS"); env_loops && env_loops[0]) {
++        const int req = std::atoi(env_loops);
++        if (req >= 1 && req <= 6) {
++            n_passes = (uint32_t) req;
++            if (n_passes == 1) {
++                varying = true;
++            }
++        }
++    }
+     ml.get_key(LLM_KV_LOOP_GATE_RANK, gate_rank);
+     ml.get_key(LLM_KV_LOOP_VARYING,   varying, false);
+ 
+@@ -21,7 +162,15 @@ void llama_model_inkling2_loop::load_arch_hparams(llama_model_loader & ml) {
+         throw std::runtime_error(format("inkling2_loop: invalid loop core [%u, %u) with block size %u, %u passes or gate rank %u for %d layers",
+                 core_start, core_end, block, n_passes, gate_rank, n_phys));
+     }
+-    const size_t n_slot = n_phys + (size_t) (n_passes - 1)*(core_end - core_start);
++    size_t n_slot = n_phys + (size_t) (n_passes - 1)*(core_end - core_start);
++    const int   loopcd_mode  = get_loopcd_mode();
++    const float loopcd_omega = get_loopcd_omega(loopcd_mode);
++    if ((loopcd_mode == 1 || loopcd_mode == 2) && loopcd_omega != 0.0f && n_passes > 1) {
++        loopcd_aux_base = (int) n_slot;
++        n_slot += (size_t) (n_phys - core_end);
++    } else {
++        loopcd_aux_base = 0;
++    }
+     if (n_slot > LLAMA_MAX_LAYERS) {
+         throw std::runtime_error(format("inkling2_loop: %zu cache slots exceed the maximum of %d", n_slot, LLAMA_MAX_LAYERS));
+     }
+@@ -82,6 +231,13 @@ llama_model_inkling2_loop::graph::graph(const llm_graph_params & params) : llama
+         cur = build_layer(il, il, cur, blocks);
+     }
+ 
++    const int   loopcd_mode   = get_loopcd_mode();
++    const float loopcd_omega  = get_loopcd_omega(loopcd_mode);
++    const int   loopcd_ref    = get_loopcd_ref(loopcd_mode);
++    const bool  loopcd_blocks = get_loopcd_blocks();
++    ggml_tensor * pass_ref_cur = nullptr;
++    std::vector<ggml_tensor *> pass_ref_blocks;
++
+     // every pass starts from the prelude output
+     auto * prelude = cur;
+     const auto prelude_blocks = blocks;
+@@ -104,10 +260,59 @@ llama_model_inkling2_loop::graph::graph(const llm_graph_params & params) : llama
+             const auto & loop = m.loop_layers[ip - start];
+             cur = build_layer(il, ip, cur, blocks, mix(bank, bank_out, loop.msg_query), &loop);
+         }
++        if ((int) pass == loopcd_ref) {
++            pass_ref_cur = cur;
++            pass_ref_blocks = blocks;
++        }
++    }
++
++    // LoopCD-Hidden (Eq. 2): zero-overhead hidden-state extrapolation before Coda
++    if ((loopcd_mode == 0 || loopcd_mode == 3) && loopcd_omega != 0.0f &&
++        pass_ref_cur != nullptr && m.n_passes > 1 && loopcd_ref < (int) m.n_passes - 1) {
++        cur = ggml_add(ctx0, cur, ggml_scale(ctx0, ggml_sub(ctx0, cur, pass_ref_cur), loopcd_omega));
++        if (loopcd_blocks) {
++            for (size_t bi = prelude_blocks.size(); bi < blocks.size() && bi < pass_ref_blocks.size(); ++bi) {
++                blocks[bi] = ggml_add(ctx0, blocks[bi], ggml_scale(ctx0, ggml_sub(ctx0, blocks[bi], pass_ref_blocks[bi]), loopcd_omega));
++            }
++        }
+     }
+ 
+     for (int il = end; il < m.n_phys; ++il) {
+         cur = build_layer(il, il, cur, blocks);
+     }
+     build_output(cur, blocks);
++
++    // LoopCD-Logits (Eq. 3 fixed / Eq. 4 adaptive margin-gated): auxiliary Coda + lm_head on pass_ref
++    if ((loopcd_mode == 1 || loopcd_mode == 2) && loopcd_omega != 0.0f &&
++        pass_ref_cur != nullptr && m.loopcd_aux_base > 0 && m.n_passes > 1 && loopcd_ref < (int) m.n_passes - 1) {
++        ggml_tensor * embd_R   = res->t_embd;
++        ggml_tensor * logits_R = res->t_logits;
++
++        ggml_tensor * ref_cur = pass_ref_cur;
++        std::vector<ggml_tensor *> ref_blocks = pass_ref_blocks;
++        for (int ip = end; ip < m.n_phys; ++ip) {
++            const int il_aux = m.loopcd_aux_base + (ip - end);
++            ref_cur = build_layer(il_aux, ip, ref_cur, ref_blocks);
++        }
++        build_output(ref_cur, ref_blocks);
++        ggml_tensor * logits_ref = res->t_logits;
++
++        ggml_tensor * combined = nullptr;
++        if (loopcd_mode == 2 && modchip_ink2::tensor_on_cpu(model.output)) {
++            ggml_tensor * args[2] = { logits_R, logits_ref };
++            combined = ggml_custom_4d(
++                    ctx0, GGML_TYPE_F32,
++                    logits_R->ne[0], logits_R->ne[1], logits_R->ne[2], logits_R->ne[3],
++                    args, 2,
++                    loopcd_combine_logits_op,
++                    GGML_N_TASKS_MAX,
++                    intern_loopcd_params(loopcd_omega, 1));
++        } else {
++            // Fixed Eq. 3 (all backends: CPU, Metal, CUDA, Vulkan, SYCL) or GPU fallback
++            combined = ggml_add(ctx0, logits_R, ggml_scale(ctx0, ggml_sub(ctx0, logits_R, logits_ref), loopcd_omega));
++        }
++        cb(combined, "result_output", -1);
++        res->t_logits = combined;
++        res->t_embd   = embd_R;
++    }
+ }
 diff --git a/src/models/inkling2.cpp b/src/models/inkling2.cpp
-index 3e43ef418..ad0c2d2b6 100644
+index 3e43ef4..ad0c2d2 100644
 --- a/src/models/inkling2.cpp
 +++ b/src/models/inkling2.cpp
 @@ -1,5 +1,6 @@
@@ -19488,7 +19740,7 @@ index 3e43ef418..ad0c2d2b6 100644
      cb(cur, "result_output", -1);
      res->t_logits = cur;
 diff --git a/src/models/models.h b/src/models/models.h
-index 636afeae9..1cf3fd3d3 100644
+index 636afea..351b124 100644
 --- a/src/models/models.h
 +++ b/src/models/models.h
 @@ -2508,7 +2508,7 @@ struct llama_model_inkling2 : public llama_model_base {
@@ -19512,8 +19764,16 @@ index 636afeae9..1cf3fd3d3 100644
      };
  
      std::unique_ptr<llm_graph_context> build_arch_graph(const llm_graph_params & params) const override;
+@@ -2557,6 +2562,7 @@ struct llama_model_inkling2_loop : public llama_model_inkling2 {
+     uint32_t n_passes   = 0;
+     uint32_t gate_rank  = 0;
+     bool     varying    = false; // trained for a varying number of passes
++    int      loopcd_aux_base = 0; // auxiliary Coda cache slot base for LoopCD-Logits (0 when disabled)
+ 
+     // indexed by physical layer - core_start
+     std::vector<loop_layer> loop_layers;
 diff --git a/src/models/nemotron-h-moe.cpp b/src/models/nemotron-h-moe.cpp
-index 475355832..b73ebd933 100644
+index 4753558..b73ebd9 100644
 --- a/src/models/nemotron-h-moe.cpp
 +++ b/src/models/nemotron-h-moe.cpp
 @@ -108,17 +108,17 @@ llama_model_nemotron_h_moe::graph_mtp::graph_mtp(const llm_graph_params & params
@@ -19540,7 +19800,7 @@ index 475355832..b73ebd933 100644
                  nullptr, // no gate
                  layer.ffn_down_exps_s);
 diff --git a/src/models/nemotron-h.cpp b/src/models/nemotron-h.cpp
-index 313f42f1c..00d5a2a12 100644
+index 313f42f..00d5a2a 100644
 --- a/src/models/nemotron-h.cpp
 +++ b/src/models/nemotron-h.cpp
 @@ -128,6 +128,7 @@ void llama_model_nemotron_h::load_arch_tensors(llama_model_loader & ml) {
@@ -19588,7 +19848,7 @@ index 313f42f1c..00d5a2a12 100644
                      nullptr, // no gate
                      model.layers[il].ffn_down_exps_s);
 diff --git a/src/models/qwen35moe.cpp b/src/models/qwen35moe.cpp
-index c0ee6fa03..5662039b2 100644
+index c0ee6fa..5662039 100644
 --- a/src/models/qwen35moe.cpp
 +++ b/src/models/qwen35moe.cpp
 @@ -54,7 +54,7 @@ void llama_model_qwen35moe::load_arch_tensors(llama_model_loader & ml) {
@@ -19678,7 +19938,7 @@ index c0ee6fa03..5662039b2 100644
              layer.ffn_gate_exps_s,
              layer.ffn_down_exps_s);
 diff --git a/src/models/qwen4exp.cpp b/src/models/qwen4exp.cpp
-index 7bf9b3fee..69eebe192 100644
+index 7bf9b3f..69eebe1 100644
 --- a/src/models/qwen4exp.cpp
 +++ b/src/models/qwen4exp.cpp
 @@ -225,7 +225,7 @@ void llama_model_qwen4exp::load_arch_tensors(llama_model_loader & ml) {
@@ -19748,7 +20008,7 @@ index 7bf9b3fee..69eebe192 100644
              model.layers[il].ffn_gate_exps_s,
              model.layers[il].ffn_down_exps_s);
 diff --git a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
-index 11bfa42a9..708b033f8 100644
+index 11bfa42..708b033 100644
 --- a/tests/test-backend-ops.cpp
 +++ b/tests/test-backend-ops.cpp
 @@ -2809,7 +2809,8 @@ struct test_set_rows : public test_case {
@@ -19860,7 +20120,7 @@ index 11bfa42a9..708b033f8 100644
      // gpt-oss issue with Vulkan mmq_id
      test_cases.emplace_back(new test_mul_mat_id(GGML_TYPE_MXFP4, GGML_TYPE_F32, 32, 2, false, 2880, 32, 2880));
 diff --git a/tests/test-quantize-fns.cpp b/tests/test-quantize-fns.cpp
-index 1542ab656..9a2153b90 100644
+index 1542ab6..9a2153b 100644
 --- a/tests/test-quantize-fns.cpp
 +++ b/tests/test-quantize-fns.cpp
 @@ -2,6 +2,32 @@
@@ -20037,7 +20297,7 @@ index 1542ab656..9a2153b90 100644
  
      if (num_failed || verbose) {
 diff --git a/tools/imatrix/imatrix.cpp b/tools/imatrix/imatrix.cpp
-index 7abd83ead..e6a30240a 100644
+index 7abd83e..e6a3024 100644
 --- a/tools/imatrix/imatrix.cpp
 +++ b/tools/imatrix/imatrix.cpp
 @@ -1946,7 +1946,9 @@ int main(int argc, char ** argv) {
@@ -20052,7 +20312,7 @@ index 7abd83ead..e6a30240a 100644
                      return 1;
                  }
 diff --git a/tools/quantize/quantize.cpp b/tools/quantize/quantize.cpp
-index 0debcfdda..bb5c63ea7 100644
+index 0debcfd..bb5c63e 100644
 --- a/tools/quantize/quantize.cpp
 +++ b/tools/quantize/quantize.cpp
 @@ -33,7 +33,9 @@ struct quant_option {
@@ -20068,7 +20328,7 @@ index 0debcfdda..bb5c63ea7 100644
      { "MXFP4_MOE",LLAMA_FTYPE_MOSTLY_MXFP4_MOE," MXFP4 MoE",  },
 diff --git a/tools/server/rc_harp_radix.h b/tools/server/rc_harp_radix.h
 new file mode 100644
-index 000000000..44596ed58
+index 0000000..44596ed
 --- /dev/null
 +++ b/tools/server/rc_harp_radix.h
 @@ -0,0 +1,182 @@
@@ -20255,7 +20515,7 @@ index 000000000..44596ed58
 +static_assert(sizeof(rc_harp_disk_record) == 24, "rc_harp_disk_record must be 24 bytes");
 +
 diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
-index bfade25d7..19851939c 100644
+index bfade25..1985193 100644
 --- a/tools/server/server-context.cpp
 +++ b/tools/server/server-context.cpp
 @@ -1133,6 +1133,11 @@ private:
@@ -20602,7 +20862,7 @@ index bfade25d7..19851939c 100644
          return false;
      }
 diff --git a/tools/server/server-slot-sched.cpp b/tools/server/server-slot-sched.cpp
-index 9f9779348..cc484eb13 100644
+index 9f97793..cc484eb 100644
 --- a/tools/server/server-slot-sched.cpp
 +++ b/tools/server/server-slot-sched.cpp
 @@ -108,12 +108,22 @@ server_prompt_cache_state * server_prompt_cache::alloc(const server_prompt & pro
@@ -20840,7 +21100,7 @@ index 9f9779348..cc484eb13 100644
          }
      }
 diff --git a/tools/server/server-slot-sched.h b/tools/server/server-slot-sched.h
-index fc0099dc0..8eb81653e 100644
+index fc0099d..8eb8165 100644
 --- a/tools/server/server-slot-sched.h
 +++ b/tools/server/server-slot-sched.h
 @@ -2,6 +2,7 @@

@@ -9,7 +9,7 @@
     [string]$SrcRoot = ""
 )
 
-# Builds the unified llama-modchip v3.2.1 engine on Windows (MinGW-w64 CPU or MSVC + CUDA).
+# Builds the unified llama-modchip v3.2.2 engine on Windows (MinGW-w64 CPU or MSVC + CUDA).
 # Supports Qwen3.8-Flash-Next, DeepSeek-V4-Flash, and Nemotron-3.5-30B with zero-collision custom types:
 #   - GGML_TYPE_Q2_0       = 42 (upstream 18 B/64 untouched)
 #   - GGML_TYPE_F8_E4M3    = 43 (upstream untouched)
@@ -32,7 +32,7 @@ $BuildDir   = if ($Cuda) { Join-Path $LlamaDir "build-cuda" } else { Join-Path $
 function Fail([string]$Msg) { Write-Host "[!] $Msg" -ForegroundColor Red; exit 1 }
 
 Write-Host "================================================================================" -ForegroundColor Cyan
-Write-Host "  llama-modchip v3.2.1 Unified Windows Engine Build (Qwen3.8 + DeepSeek-V4 + Nemotron)" -ForegroundColor Green
+Write-Host "  llama-modchip v3.2.2 Unified Windows Engine Build (Qwen3.8 + DeepSeek-V4 + Nemotron)" -ForegroundColor Green
 Write-Host ("  Target : {0} | Backend: {1}" -f $Target, $(if ($Cuda) { "CUDA sm_$Arch + CPU (MSVC)" } else { "CPU Native SIMD (MinGW-w64)" })) -ForegroundColor Green
 Write-Host "================================================================================" -ForegroundColor Cyan
 

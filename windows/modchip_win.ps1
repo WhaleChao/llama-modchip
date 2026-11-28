@@ -22,7 +22,7 @@ if (-not (Test-Path $ModelDir)) { New-Item -ItemType Directory -Path $ModelDir |
 function Write-Banner {
     Clear-Host
     Write-Host "================================================================================" -ForegroundColor Cyan
-    Write-Host "  llama-modchip v3.2.1 -- Windows Hybrid GPU + CPU MoE Edition" -ForegroundColor Green
+    Write-Host "  llama-modchip v3.2.2 -- Windows Hybrid GPU + CPU MoE Edition" -ForegroundColor Green
     Write-Host "  Optimized for NVIDIA RTX / AMD Vulkan (8-16 GB VRAM) + CPU (16-128 GB RAM)" -ForegroundColor White
     Write-Host "================================================================================" -ForegroundColor Cyan
 }
@@ -512,7 +512,7 @@ try {
 $gpuMoeCount = $selectedModel.TotalMoe - $nCpuMoe
 Write-Host ""
 Write-Host "================================================================================" -ForegroundColor Green
-Write-Host "  LAUNCHING HYBRID GPU + CPU ENGINE (llama-modchip v3.2.1 Windows)" -ForegroundColor Green
+Write-Host "  LAUNCHING HYBRID GPU + CPU ENGINE (llama-modchip v3.2.2 Windows)" -ForegroundColor Green
 Write-Host "================================================================================" -ForegroundColor Green
 Write-Host ("  - Active Model       : {0}" -f $selectedModel.FileName) -ForegroundColor White
 Write-Host ("  - Active Context     : {0} tokens (KV Cache Q8_0/Q4_0 + Flash-Attn)" -f $ctxSize) -ForegroundColor White

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-llama-modchip v3.2.1 — Zero-Dependency Interactive Terminal Chat & Shareable Benchmark Suite
+llama-modchip v3.2.2 — Zero-Dependency Interactive Terminal Chat & Shareable Benchmark Suite
 Connects to local Gateway (8787) or llama-server (8789/8080/8001), streams tokens live,
 and reports exact Prefill tok/s, Decode tok/s, TTFT, and NextN Draft-MTP / Stockfish-PVS acceptance.
 """
@@ -745,7 +745,7 @@ def run_benchmark_suite(base_url: str) -> None:
     raw_model, model_display, prompt_label = detect_active_model(base_url)
     spec_lbl = "RouteCrack 2.0"
     print(f"\n{BOLD}{CYAN}╔════════════════════════════════════════════════════════════════════════════════════╗{RESET}")
-    print(f"{BOLD}{CYAN}║ ♟️  llama-modchip v3.2.1 — Automated 2-Stage CPU Benchmark Suite                      ║{RESET}")
+    print(f"{BOLD}{CYAN}║ ♟️  llama-modchip v3.2.2 — Automated 2-Stage CPU Benchmark Suite                      ║{RESET}")
     print(f"{BOLD}{CYAN}╚════════════════════════════════════════════════════════════════════════════════════╝{RESET}")
     print(f"  • Hardware : {hw_header}")
     if aff_header:
@@ -805,7 +805,7 @@ def run_benchmark_suite(base_url: str) -> None:
         ).strip()
     except Exception:
         pass
-    ver_tag = f"v3.2.1 ({git_rev})" if git_rev else "v3.2.1"
+    ver_tag = f"v3.2.2 ({git_rev})" if git_rev else "v3.2.2"
     banner_text = f"LLAMA-MODCHIP {ver_tag} BENCHMARK SCORECARD"
     vis_w = sum(2 if ord(ch) > 0xFFFF else 1 for ch in banner_text)
     banner_line = f"║ {banner_text}{' ' * max(1, 83 - vis_w)}║"
@@ -887,7 +887,7 @@ def run_interactive_chat(base_url: str, one_shot_prompt: Optional[str] = None) -
         return
 
     print(f"{BOLD}{CYAN}╔════════════════════════════════════════════════════════════════════════════════════╗{RESET}")
-    print(f"{BOLD}{CYAN}║ ♟️  llama-modchip v3.2.1 — Interactive CPU Chat + Live Speculative Telemetry          ║{RESET}")
+    print(f"{BOLD}{CYAN}║ ♟️  llama-modchip v3.2.2 — Interactive CPU Chat + Live Speculative Telemetry          ║{RESET}")
     print(f"{BOLD}{CYAN}╚════════════════════════════════════════════════════════════════════════════════════╝{RESET}")
     print(f"  • Hardware : {hw_banner}")
     print(f"  • Model    : {BOLD}{GREEN}{model_display}{RESET}")
@@ -946,7 +946,7 @@ def run_interactive_chat(base_url: str, one_shot_prompt: Optional[str] = None) -
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="llama-modchip v3.2.1 Interactive Terminal Chat & Benchmark Client")
+    parser = argparse.ArgumentParser(description="llama-modchip v3.2.2 Interactive Terminal Chat & Benchmark Client")
     parser.add_argument("--url", default=None, help="Server or Gateway base URL (auto-detected by default)")
     parser.add_argument("--bench", action="store_true", help="Run the 2-stage benchmark suite and print shareable scorecard")
     parser.add_argument("-p", "--prompt", default=None, help="Send a single prompt, stream output, print tok/s, and exit")

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "release_version": "3.2.1",
-  "release_tag": "v3.2.1",
+  "release_version": "3.2.2",
+  "release_tag": "v3.2.2",
   "patch_file": "patches/llama-modchip-v3.2.patch",
-  "patch_sha256": "23b45516877cb0e7acb87e6b9c1586e5d5b7e0b1e4b103ffa558c3fd36fa02c8",
+  "patch_sha256": "fa74822e6d4ac9bd5460eda34d5908753128585ae2236bb29f7a14fef79d002c",
   "upstream_llama_cpp": {
     "commit": "46eb1742d",
     "build_number": 12604
@@ -42,7 +42,7 @@
     "tex": "paper/main.tex",
     "pdf": "paper/llama-modchip-paper.pdf",
     "tarball": "paper/arxiv-submission.tar.gz",
-    "required_version_string": "v3.2.1",
+    "required_version_string": "v3.2.2",
     "required_sections": [
       "RouteCrack 2.0",
       "Qwen3.8",
@@ -52,25 +52,25 @@
     "min_figures": 3
   },
   "mirrors": {
-    "github_release_base": "https://github.com/synchopate/llama-modchip/releases/download/v3.2.1",
+    "github_release_base": "https://github.com/synchopate/llama-modchip/releases/download/v3.2.2",
     "hf_binary_fallback_base": "https://huggingface.co/Synchopate/Qwen3.8-Flash-Next-MaxQ-64GB-GGUF/resolve/main"
   },
   "artifacts": {
-    "llama-server-modchip-linux-x86_64-avx512": "6cc390594f9906b18866eb0d3af534fcb2d3fa486d8b7193aa93597c703886c7",
-    "llama-server-modchip-linux-x86_64-avx2": "d4416540f0e7fa50c42048e2ff072b37d85593c3e4bb54cf534a8024f330905b",
-    "llama-server-modchip-linux-x86_64": "d4416540f0e7fa50c42048e2ff072b37d85593c3e4bb54cf534a8024f330905b",
-    "llama-cli-modchip-linux-x86_64-avx512": "011ff32668f891fd14334cfdd47bf574592c062a4f6ec6ce05ac49d9af255cea",
-    "llama-cli-modchip-linux-x86_64-avx2": "85838adb22a95c4f8e645a37b8567889e4cb9c4744c2ebbb2cfd686c66e6f249",
-    "llama-cli-modchip-linux-x86_64": "85838adb22a95c4f8e645a37b8567889e4cb9c4744c2ebbb2cfd686c66e6f249",
-    "llama-bench-modchip-linux-x86_64-avx512": "4b923d9a4d7ad804154a890d101255985096abd1c360b7fe430239c068a09588",
-    "llama-bench-modchip-linux-x86_64-avx2": "e0cc573b2cd9cf333d1105edf21b926994cd18d3a60f7985cde0a45df8c5df7f",
-    "llama-perplexity-modchip-linux-x86_64-avx512": "e9b676c7d8012b3831dfef43cf883e94a2788d5ffdd8606f87c09b12fb677f41",
-    "llama-perplexity-modchip-linux-x86_64-avx2": "397f95e83ced02d864804e4993c666a45ccc640b35c5b99c44ed4dd758ee85aa",
-    "llama-quantize-modchip-linux-x86_64-avx512": "69fc09f1948c0057c9cc86ff3fd74e80cf9876fe8b19d6f97113e7957ce65573",
-    "llama-quantize-modchip-linux-x86_64-avx2": "46836e4fd1cb54ab581f6429be77735695dc63dfe15a16d65f4f276a19f767ec"
+    "llama-server-modchip-linux-x86_64-avx512": "c673cad9e7aa45e2351e92247ebf9791a934b835cf6a1f3e9c7e46f27b25bdc6",
+    "llama-server-modchip-linux-x86_64-avx2": "9465fa9c21eabf8b843997e95537b5b545313e8181b25cbfd3a6449549b827d8",
+    "llama-server-modchip-linux-x86_64": "9465fa9c21eabf8b843997e95537b5b545313e8181b25cbfd3a6449549b827d8",
+    "llama-cli-modchip-linux-x86_64-avx512": "cd949bf1785b747952a802007195db6b927f46fbff2f126743787d064250db79",
+    "llama-cli-modchip-linux-x86_64-avx2": "ff13d9fa32a3ba6502aedacad2ccf2598d18312ccbe6de8cb9cde3a5d5bb7301",
+    "llama-cli-modchip-linux-x86_64": "ff13d9fa32a3ba6502aedacad2ccf2598d18312ccbe6de8cb9cde3a5d5bb7301",
+    "llama-bench-modchip-linux-x86_64-avx512": "fd6a9624417921b20c363e6958807fe16e222fd37fd8d3d53eda5c49a29c67c2",
+    "llama-bench-modchip-linux-x86_64-avx2": "7a5b5146638954e7a5206fb7398fa298cd7ca890ac5f04a14d9dabb022241c19",
+    "llama-perplexity-modchip-linux-x86_64-avx512": "19f35504b91a392ad5682426737d1567e9fa13c33b19ce3662aa1f556932f08b",
+    "llama-perplexity-modchip-linux-x86_64-avx2": "2262daade88e4269bec9ed2dc8be1e735490833c903bf7612c8b7f880069667d",
+    "llama-quantize-modchip-linux-x86_64-avx512": "f34d3f046513d535d392dfaa6a44a2045a69abbfc945a71c4a5ee524bd2c3a43",
+    "llama-quantize-modchip-linux-x86_64-avx2": "b33bd3da311ec61daea7e8f626e2108642e9d077d40bdc36b685efa0942eb1ac"
   },
   "github_only_artifacts": {
-    "llama-modchip-v3.2.1-linux-x86_64.tar.gz": "9403629e54b9134cb3f9784ba77a47b8bb5da81565e8e236e8836e2892477022"
+    "llama-modchip-v3.2.2-linux-x86_64.tar.gz": "7ce80d0109e8d580833bfe3c7988f0c8402774ad91b2212a6f67de76b547f228"
   },
   "benchmarks": [
     {
@@ -130,6 +130,23 @@
         "configs.unfused_nta_off.tg128_tok_per_s": 10.4,
         "configs.fused_nta_on.pp512_tok_per_s": 227.43,
         "configs.fused_nta_on.tg128_tok_per_s": 13.29
+      }
+    },
+    {
+      "json": "benchmarks/results/inkling2_monza_v3_loopcd_v322.json",
+      "docs": [
+        "README.md",
+        "RELEASE_NOTES.md",
+        "ARCHITECTURE.md",
+        "FAQ.md",
+        "paper/main.tex"
+      ],
+      "key_metrics": {
+        "blind_mc_563.configs.base_R3.micro_pct": 68.21,
+        "blind_mc_563.configs.loopcd_logits_adaptive_w100_r0.micro_pct": 71.58,
+        "blind_mc_563.configs.placebo_negative_w_neg050_r0.micro_pct": 62.88,
+        "generation_safety_gate_60.configs.base_R3.total_pct": 91.67,
+        "generation_safety_gate_60.configs.loopcd_adaptive_w050_r0.total_pct": 93.33
       }
     }
   ]

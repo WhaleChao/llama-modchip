@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "release_tag": "v3.2.2",
+  "benchmark_name": "Inkling-2-Mini Monza-RS v3 — Opt-In LoopCD (arXiv:2610.02185) Causal & Generation Gate",
+  "model_label": "Inkling-2-Mini-Monza-RS-v3-Ultimate (26.07B / 3.4B active, 14.34 GiB MaxQ)",
+  "model_path": "Inkling-2-Mini-Monza-RS-v3-Ultimate.gguf",
+  "model_sha256": "5f1df36927b56d761ede5359c1212d8443cee8330269062c0a0a3c96ed616038",
+  "hardware": "AMD Ryzen 9 9955HX 16-Core Processor (0 GPU, CPU-only)",
+  "reference_paper": "LoopCD: Decoding Looped Transformers Better for (Almost) Free (arXiv:2610.02185)",
+  "speed_bench_12t": {
+    "base_R3_tg128_tok_per_s": 11.24,
+    "loopcd_hidden_R3_tg128_tok_per_s": 11.61,
+    "loopcd_adaptive_logits_R3_tg128_tok_per_s": 10.67,
+    "loopcd_adaptive_decode_overhead_pct": -5.07,
+    "variable_R2_tg128_tok_per_s": 15.04,
+    "variable_R4_tg128_tok_per_s": 9.9
+  },
+  "blind_mc_563": {
+    "n_total": 563,
+    "suites": {
+      "winogrande": 199,
+      "arc_challenge": 150,
+      "mmlu": 114,
+      "hellaswag": 100
+    },
+    "configs": {
+      "base_R3": {
+        "mode": "off",
+        "omega": 0.0,
+        "ref_pass": 0,
+        "winogrande_pct": 71.86,
+        "arc_challenge_pct": 67.33,
+        "mmlu_pct": 52.63,
+        "hellaswag_pct": 80.0,
+        "macro_mean_pct": 67.96,
+        "micro_correct": 384,
+        "micro_pct": 68.21
+      },
+      "loopcd_hidden_w040_r1": {
+        "mode": "hidden",
+        "omega": 0.4,
+        "ref_pass": 1,
+        "winogrande_pct": 74.37,
+        "arc_challenge_pct": 68.0,
+        "mmlu_pct": 52.63,
+        "hellaswag_pct": 80.0,
+        "macro_mean_pct": 68.75,
+        "micro_correct": 390,
+        "micro_pct": 69.27,
+        "delta_micro_pp": 1.07,
+        "wins": 10,
+        "losses": 4,
+        "mcnemar_2sided_p": 0.17957
+      },
+      "loopcd_logits_fixed_w050_r0": {
+        "mode": "logits",
+        "omega": 0.5,
+        "ref_pass": 0,
+        "winogrande_pct": 74.37,
+        "arc_challenge_pct": 72.67,
+        "mmlu_pct": 53.51,
+        "hellaswag_pct": 83.0,
+        "macro_mean_pct": 70.89,
+        "micro_correct": 401,
+        "micro_pct": 71.23,
+        "delta_micro_pp": 3.02,
+        "wins": 32,
+        "losses": 15,
+        "mcnemar_2sided_p": 0.018624
+      },
+      "loopcd_logits_adaptive_w100_r0": {
+        "mode": "adaptive",
+        "omega": 1.0,
+        "ref_pass": 0,
+        "winogrande_pct": 75.38,
+        "arc_challenge_pct": 72.67,
+        "mmlu_pct": 55.26,
+        "hellaswag_pct": 81.0,
+        "macro_mean_pct": 71.08,
+        "micro_correct": 403,
+        "micro_pct": 71.58,
+        "delta_micro_pp": 3.37,
+        "wins": 43,
+        "losses": 24,
+        "mcnemar_2sided_p": 0.02712,
+        "vs_negative_placebo_delta_pp": 8.7,
+        "vs_negative_placebo_mcnemar_p": 1.17e-05
+      },
+      "placebo_negative_w_neg050_r0": {
+        "mode": "logits",
+        "omega": -0.5,
+        "ref_pass": 0,
+        "winogrande_pct": 67.84,
+        "arc_challenge_pct": 61.33,
+        "mmlu_pct": 44.74,
+        "hellaswag_pct": 76.0,
+        "macro_mean_pct": 62.48,
+        "micro_correct": 354,
+        "micro_pct": 62.88,
+        "delta_micro_pp": -5.33,
+        "wins": 13,
+        "losses": 43,
+        "mcnemar_2sided_p": 7.3332e-05
+      }
+    }
+  },
+  "generation_safety_gate_60": {
+    "n_total": 60,
+    "temperature": 0.0,
+    "max_tokens": 2048,
+    "configs": {
+      "base_R3": {
+        "ifeval_strict_pct": 80.0,
+        "ifeval_trunc": 3,
+        "humaneval_plus_pct": 95.0,
+        "humaneval_trunc": 0,
+        "italian_enterprise_pct": 100.0,
+        "italian_enterprise_trunc": 1,
+        "italian_enterprise_mean_thinking_chars": 1372,
+        "total_correct": 55,
+        "total_pct": 91.67
+      },
+      "loopcd_adaptive_w050_r0": {
+        "ifeval_strict_pct": 85.0,
+        "ifeval_trunc": 2,
+        "humaneval_plus_pct": 95.0,
+        "humaneval_trunc": 1,
+        "italian_enterprise_pct": 100.0,
+        "italian_enterprise_trunc": 0,
+        "italian_enterprise_mean_thinking_chars": 1300,
+        "total_correct": 56,
+        "total_pct": 93.33,
+        "wins": 1,
+        "losses": 0
+      },
+      "loopcd_adaptive_w100_r0": {
+        "ifeval_strict_pct": 85.0,
+        "ifeval_trunc": 2,
+        "humaneval_plus_pct": 90.0,
+        "humaneval_trunc": 2,
+        "italian_enterprise_pct": 100.0,
+        "italian_enterprise_trunc": 0,
+        "italian_enterprise_mean_thinking_chars": 1023,
+        "total_correct": 55,
+        "total_pct": 91.67,
+        "wins": 1,
+        "losses": 1
+      }
+    }
+  }
+}

@@ -152,7 +152,7 @@ $modelAlias = if ($isQwen38) { "qwen3.8-flash-next" } elseif ($isNemotron) { "ne
 $kvTypeV    = if ($isNemotron -and $KvType -eq "q8_0") { "q4_0" } else { $KvType }
 if (-not $isNemotron) { $env:RC_TABLES_DIR = "/nonexistent" }
 
-Write-Head ("llama-modchip v3.2.1 -- {0} on Windows" -f $(if ($isQwen38) { "Qwen3.8-Flash-Next MaxQ" } elseif ($isNemotron) { "NVIDIA-Nemotron-3.5-30B-A3B" } else { "DeepSeek-V4-Flash 284B" }))
+Write-Head ("llama-modchip v3.2.2 -- {0} on Windows" -f $(if ($isQwen38) { "Qwen3.8-Flash-Next MaxQ" } elseif ($isNemotron) { "NVIDIA-Nemotron-3.5-30B-A3B" } else { "DeepSeek-V4-Flash 284B" }))
 
 if ($Threads -le 0) { $Threads = [math]::Max(1, $hw.PhysCores - 1) }
 
